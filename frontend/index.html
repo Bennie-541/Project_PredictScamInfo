@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>預測詐騙訊息</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>檢查可疑訊息</h1>
+
+    <div class="main-container"> <section id="input_area" class="panel"> <textarea id="predict_info" placeholder="請輸入內容 (最多5000字)" maxlength="5000"></textarea>
+            <div class="button-group">
+                <button id="detect_button" type="submit">檢測！</button>
+                <button id="clear_button" type="reset">清除</button>
+            </div>
+        </section>
+
+        <section id="output_area" class="panel"> <h2>檢測結果</h2> <p><strong>是否為詐騙訊息：</strong> <span id="is_scam">待檢測</span></p>
+            <p><strong>模型預測可信度：</strong> <span id="confidence_score">待檢測</span></p>
+            <p><strong>可疑詞句分析：</strong></p>
+            <div id="suspicious_phrases">
+                <p>請輸入訊息並點擊「檢測！」按鈕。</p>
+            </div>
+        </section>
+    </div> <script src="script.js"></script>
+</body>
+</html>
