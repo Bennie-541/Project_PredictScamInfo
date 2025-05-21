@@ -36,7 +36,7 @@ class BertPreprocessor:
         df["message"] = df["message"].astype(str)
         df["message"] = df["message"].apply(lambda text: re.sub(r"\s+", "", text))
         df["message"] = df["message"].apply(lambda text: re.sub(r"[^\u4e00-\u9fffA-Za-z0-9。，！？]", "", text))
-        return df["message", "label"]  # 保留必要欄位
+        return df[["message", "label"]]  # 保留必要欄位
 
     def encode(self, messages):
         #使用 HuggingFace BERT Tokenizer 將訊息編碼成模型輸入格式。
@@ -95,3 +95,10 @@ class ScamDataset(Dataset):
         }
 
 #製作 train/val 資料集與 DataLoader
+train_texts, val_texts, train_labels, val_labels = train_test_split(
+    bert_inputs["message"], bert_inputs["label"],
+    stratify=bert_inputs["label"],
+    test_size=0.2,
+    random_state=25,
+    shuffle=True
+)
