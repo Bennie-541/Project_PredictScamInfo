@@ -1,5 +1,29 @@
 # main.py (簡化版本，僅保留文字詐騙分析功能)
-
+"""
+-------一定要做步驟-------
+如果以anaconda開啟vscode請先確認有安狀下列套件
+pip install transformers
+#pip install torch         //transformers 套件需要
+#pip install scikit-learn
+#pip install transformers torch
+->打開terminal再來按+號
+->點git bash
+->看到這表示正常，注意資料夾位置，像我的是D槽Project_PredictScamInfo
+(user@LAPTOP-GPASQDRA MINGW64 /d/Project_PredictScamInfo (Update)
+$ )
+->輸入 "cd Backend"
+->(/d/Project_PredictScamInfo/Backend)位址有Backend就是GOOD
+->輸入" uvicorn app:app --reload "
+->(INFO:     Will watch for changes in these directories: ['D:\\Project_PredictScamInfo\\Backend']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.)
+INFO:     Started reloader process [70644] using StatReload)這樣表示正常
+->
+----正確顯示---
+INFO:     Uvicorn running on http://127.0.0.1:8000
+INFO:     Started reloader process...
+"""
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -83,7 +107,7 @@ async def analyze_text_api(request: TextAnalysisRequest):
             "analysis_result": {
                 "status": result["status"],
                 "confidence": result["confidence"],
-                "suspicious_keywords": result["suspicious_parts"],
+                "suspicious_keywords": result["suspicious_keywords"],
                 "risk_level": risk_level
             },
             "timestamp": datetime.now(),
@@ -95,7 +119,7 @@ async def analyze_text_api(request: TextAnalysisRequest):
         return TextAnalysisResponse(
             status=result["status"],
             confidence=result["confidence"],
-            suspicious_keywords=result["suspicious_parts"],
+            suspicious_keywords=result["suspicious_keywords"],
             risk_level=risk_level,
             analysis_timestamp=datetime.now(),
             text_id=text_id

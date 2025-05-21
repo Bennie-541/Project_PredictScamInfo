@@ -56,7 +56,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json(); 
 
             // 根據後端回傳的資料更新前端介面
-            updateResults(data.is_scam, data.confidence, data.suspicious_phrases);
+            const isScam = ["詐騙", "高風險", "目前為測試階段"].includes(data.status);
+            updateResults(
+                isScam,
+                data.confidence,
+                data.suspicious_keywords
+            );
+
 
         } catch (error) {
             // 捕獲並處理任何在 fetch 過程中發生的錯誤 (例如網路問題、CORS 錯誤)
@@ -75,12 +81,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * 更新結果顯示的輔助函數
-     * @param {boolean} isScam - 是否為詐騙訊息 (從後端獲取)
+     * @param {string} isScam- 是否為詐騙訊息 (從後端獲取)(原始要得"@"param {boolean} isScam )
      * @param {number} confidence - 模型預測可信度 (0-1, 從後端獲取)
      * @param {string[]} suspiciousParts - 可疑詞句陣列 (從後端獲取)
      */
+    
     function updateResults(isScam, confidence, suspiciousParts) {
         // 根據 isScam 的布林值顯示不同的文字和顏色
+        isScamSpan.textContent = isScam;
         if (isScam) {
             isScamSpan.textContent = '是，這極有可能是詐騙訊息！🚨';
             isScamSpan.style.color = '#c0392b'; // 深紅色
@@ -90,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 顯示模型預測的可信度，轉換為百分比並保留兩位小數
-        confidenceScoreSpan.textContent = `${(confidence * 100).toFixed(2)}%`; 
+        confidenceScoreSpan.textContent = confidence//`${(confidence * 100).toFixed(2)}%`; 
 
         suspiciousPhrasesDiv.innerHTML = ''; // 清空之前顯示的可疑詞句
 

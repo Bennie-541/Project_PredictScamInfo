@@ -56,9 +56,7 @@ h2 { /* 針對檢測結果的 h2 */
     align-items: center; /* 讓輸入框和按鈕在 input_area 中居中 */
 }
 
-#output_area {
-    /* 特定於 output_area 的樣式，如果需要 */
-}
+
 
 textarea {
     width: 100%; /* 佔滿 panel 寬度 */
