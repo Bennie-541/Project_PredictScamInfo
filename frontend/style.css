@@ -1,0 +1,184 @@
+/* style.css */
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0; /* 將 body 的 margin 設為 0，讓內容可以更貼近邊緣 */
+    padding: 20px; /* 內邊距留點空間 */
+    background-color: #f4f7f6;
+    color: #333;
+    line-height: 1.6;
+    display: flex; /* 讓 body 成為 flex 容器 */
+    flex-direction: column; /* 內容垂直排列 */
+    min-height: 100vh; /* 讓 body 至少佔滿整個視窗高度 */
+    align-items: center; /* 讓 h1 居中 */
+}
+
+h1 {
+    color: #2c3e50;
+    text-align: center;
+    margin-bottom: 30px; /* 增加標題下方的間距 */
+    font-size: 2.5em; /* 讓標題更大一點 */
+}
+
+h2 { /* 針對檢測結果的 h2 */
+    color: #2c3e50;
+    text-align: center;
+    margin-top: 0; /* 移除頂部 margin，讓它更靠近 panel 頂部 */
+    margin-bottom: 20px;
+    font-size: 1.8em;
+}
+
+/* --- 主容器 Flexbox 佈局 --- */
+.main-container {
+    display: flex; /* 啟用 Flexbox */
+    flex-direction: row; /* 預設就是 row，讓子元素水平排列 */
+    gap: 30px; /* 左右兩個 panel 之間的間距 */
+    width: 100%; /* 佔滿可用寬度 */
+    max-width: 1200px; /* 設定最大寬度，避免在寬螢幕上過於分散 */
+    justify-content: center; /* 內容居中 */
+    flex-wrap: wrap; /* 當螢幕太小時，允許換行 */
+}
+
+.panel {
+    background-color: #ffffff;
+    padding: 30px; /* 增加內邊距 */
+    border-radius: 8px;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1); /* 更明顯的陰影 */
+    flex: 1; /* 讓兩個 panel 平均分配空間 */
+    min-width: 380px; /* 設定每個 panel 的最小寬度，避免縮得太小 */
+    box-sizing: border-box; /* 確保 padding 和 border 不會增加元素總寬度 */
+    display: flex; /* 讓 panel 內部內容也是 flex 容器 */
+    flex-direction: column; /* 內部內容垂直排列 */
+}
+
+#input_area {
+    /* 特定於 input_area 的樣式，如果需要 */
+    align-items: center; /* 讓輸入框和按鈕在 input_area 中居中 */
+}
+
+
+
+textarea {
+    width: 100%; /* 佔滿 panel 寬度 */
+    height: 250px; /* 增加高度 */
+    padding: 15px;
+    margin-bottom: 25px; /* 增加與按鈕的間距 */
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 1.1rem; /* 稍微放大字體 */
+    box-sizing: border-box;
+    resize: vertical;
+    outline: none; /* 移除 focus 時的藍色邊框 */
+    transition: border-color 0.3s ease;
+}
+
+textarea:focus {
+    border-color: #4CAF50; /* focus 時邊框變色 */
+}
+
+
+.button-group {
+    display: flex;
+    gap: 20px; /* 按鈕間距 */
+    justify-content: center; /* 按鈕在 group 內部居中 */
+    width: 100%; /* 佔滿寬度 */
+}
+
+button {
+    padding: 12px 30px; /* 稍微增加按鈕大小 */
+    font-size: 1.1rem;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    transition: background-color 0.3s ease, transform 0.2s ease; /* 增加 transform 過渡效果 */
+    font-weight: bold; /* 字體加粗 */
+}
+
+button[type="submit"] {
+    background-color: #4CAF50;
+    color: white;
+}
+
+button[type="submit"]:hover {
+    background-color: #45a049;
+    transform: translateY(-2px); /* 懸停時向上輕微移動 */
+}
+
+button[type="reset"] {
+    background-color: #f44336;
+    color: white;
+}
+
+button[type="reset"]:hover {
+    background-color: #da190b;
+    transform: translateY(-2px);
+}
+
+
+#output_area p {
+    font-size: 1.15rem; /* 稍微放大結果文字 */
+    margin-bottom: 12px;
+}
+
+#output_area strong {
+    color: #555;
+    font-weight: bold;
+}
+
+#is_scam, #confidence_score {
+    font-weight: bold; /* 結果狀態字體加粗 */
+}
+
+#suspicious_phrases {
+    background-color: #fffafa; /* 給可疑詞句區塊一個淺色背景 */
+    border: 1px dashed #e0baba; /* 虛線邊框 */
+    padding: 15px;
+    border-radius: 5px;
+    margin-top: 15px;
+    min-height: 80px; /* 確保高度，避免內容少時高度變化 */
+}
+
+#suspicious_phrases ul {
+    list-style-type: '🚨 '; /* 使用表情符號作為列表標記 */
+    padding-left: 20px;
+    margin: 0; /* 移除預設 margin */
+}
+
+#suspicious_phrases li {
+    margin-bottom: 8px;
+    color: #c0392b;
+    font-weight: 500;
+}
+
+#suspicious_phrases p {
+    font-style: italic;
+    color: #666;
+    margin: 0; /* 移除預設 margin */
+}
+
+/* --- 響應式設計：當螢幕較小時，垂直排列 --- */
+@media (max-width: 768px) {
+    .main-container {
+        flex-direction: column; /* 小螢幕時改為垂直堆疊 */
+        gap: 20px; /* 垂直間距 */
+        padding: 0 15px; /* 左右邊距 */
+    }
+
+    .panel {
+        flex: none; /* 取消 flex 比例，讓他們各自佔據 100% 寬度 */
+        width: 100%;
+        max-width: none; /* 移除最大寬度限制 */
+    }
+
+    h1 {
+        font-size: 2em;
+    }
+
+    h2 {
+        font-size: 1.5em;
+    }
+
+    textarea {
+        height: 200px;
+    }
+}
