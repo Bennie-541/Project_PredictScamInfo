@@ -36,7 +36,7 @@ from fastapi.middleware.cors import CORSMiddleware           # 匯入 CORS 模�
 from pydantic import BaseModel                               # 用於定義 API 的資料結構模型
 from datetime import datetime                                # 處理時間格式（如分析時間戳）
 from typing import Optional, List                            # 型別註解：可選、列表
-from bert_explainer import analyze_text as bert_analyze_text # 匯入自定義的 BERT 模型分析函式
+from Backend.bert_explainer import analyze_text as bert_analyze_text # 匯入自定義的 BERT 模型分析函式
 from firebase_admin import credentials, firestore            # Firebase 管理工具
 import firebase_admin
 
@@ -49,13 +49,13 @@ app = FastAPI(
 )
 # ---------------- 設定 CORS（允許跨網域請求） ----------------
 #FastAPI提供的內建方法，，用來加入中介層(middleware)。在請求抵達API前，或回應送出前，先做某些處理的程式邏輯。
-#(Cross-Origin Resource Sharing)一個瀏覽器安全機制。當你的前端(http://localhost:3000)，
-
-app.add_middleware(        # 要請求後端(http://localhost:8000)時，因為「不同來源」，瀏覽器會阻擋請求。      
+#(Cross-Origin Resource Sharing)一個瀏覽器安全機制。當你的前端(http://localhost:3000)-
+# -，要請求後端(http://localhost:8000)時，因為「不同來源」，瀏覽器會阻擋請求。
+app.add_middleware(             # 3000 是預設的前端開發伺服器埠號。8000是FastAPI + Uvicorn 預設後端 API 埠號
     CORSMiddleware,        # CORSMiddleware的功能就是「允許或拒絕」哪些來源能存取這個 API。
     allow_origins=["*"],   # 代表所有前端網域(如React前端、Vue前端)都可以發送請求。允許所有來源（不建議正式上線用 *）
     allow_credentials=True,# 允許前端攜帶登入憑證或 Cookies 等認證資訊。如果你使用身份驗證、JWT Token、Session cookie，就要開啟這個。若你是公開 API，沒用到登入，那設成 False 也可以。
-    allow_methods=["*"],   # 允許 GET/POST/DELETE 等方法
+    allow_methods=["*"],   # 允許 GET, POST, PUT, DELETE, OPTIONS 等方法
     allow_headers=["*"],   # 允許自訂標頭(如Content-Type)對應JS第46段。如果沒在後端加上這行，附加在HTTP請求或回應中的「額外資訊」會被擋住。
 )
 # ---------------- 請求與回應資料模型 ----------------
@@ -79,49 +79,73 @@ except Exception as e:
     print(f"Firebase 初始化錯誤: {e}")
 
 # ---------------- 根目錄測試 API ----------------
-@app.get("/")       #
+# 這是 FastAPI 的路由裝飾器，代表：當使用者對「根目錄 /」發送 HTTP GET 請求時，要執行下面這個函數。
+# "/" 是網址的根路徑，例如開啟："http://localhost:8000/"就會觸發這段程式。
+# 程式碼中/是API的根路徑。@app.get("/")代表使用者訪問網站最基本的路徑：http://localhost:8000/。這個/是URL路徑的根，不是資料夾。
+@app.get("/")
+# 宣告一個非同步函數 root()，FastAPI 支援 async，
+# 寫出高效能的非同步處理（像連資料庫、外部 API 等）
+# 雖然這裡只是回傳資料，但仍建議保留 async      
+# Q:什麼是"非同步函數"(async def)？A:因為有些操作「會花時間」：等後端模型處理，等資料庫查詢，等外部 API 回應。用於處理"等待型操作"如資料庫、模型等。
+# 還有保留 async 可以讓你未來擴充時不用重構。
 async def root():
+# 這是回傳給前端或使用者的一段 JSON 格式資料(其實就是 Python 的 dict)
     return {
-        "message": "詐騙文字辨識 API 已啟動",
-        "version": "1.0.0",
-        "status": "active",
-        "docs": "/docs"  # FastAPI 內建自動 API 文件
+        "message": "詐騙文字辨識 API 已啟動", # 說明這支 API 成功啟動
+        "version": "1.0.0", # 告訴使用者目前 API 的版本號
+        "status": "active", # 標示服務是否運行中（通常是 active 或 down）
+        "docs": "/docs"     # 告訴使用者：自動生成的 API 文件在 /docs
+# Q:/docs 是什麼？A:FastAPI 自動幫你建一個文件頁：看每個 API 的用途、參數格式
     }
 
 # ---------------- 主要 /predict 預測端點 ----------------
+# 當前端呼叫這個 API，並傳入一段文字時，這段程式會依序做以下事情：
+# 程式碼內有特別註解掉資料庫部份，因為目前資料庫對該專案並不是特別重要，所以註解的方式，避免再Render佈署前後端網頁時出錯。
 @app.post("/predict", response_model=TextAnalysisResponse)
 async def analyze_text_api(request: TextAnalysisRequest):
-    try:
+        # try:
         # 建立唯一分析 ID：以時間+使用者組成
-        text_id = f"TXT_{datetime.now().strftime('%Y%m%d%H%M%S')}_{request.user_id or 'anonymous'}"
-
+        # text_id = f"TXT_{datetime.now().strftime('%Y%m%d%H%M%S')}_{request.user_id or 'anonymous'}"
+        
+    
         # 使用模型分析該文字（實際邏輯在 bert_explainer.py）
+        # 呼叫模型進行詐騙分析，這會呼叫模型邏輯(在bert_explainer.py），把輸入文字送去分析，得到像這樣的回傳結果(假設)：
+        #result = {
+        #    "status": "詐騙",
+        #    "confidence": 0.93,
+        #    "suspicious_keywords": ["繳費", "網址", "限時"]
+        #}
         result = bert_analyze_text(request.text)
 
-        # 儲存結果到 Firebase
-        record = {
-            "text_id": text_id,
-            "text": request.text,
-            "user_id": request.user_id,
-            "analysis_result": {
-                "status": result["status"],
-                "confidence": result["confidence"],
-                "suspicious_keywords": result["suspicious_keywords"],
-            },
-            "timestamp": datetime.now(),
-            "type": "text_analysis"
-        }
-        db.collection("text_analyses").document(text_id).set(record)
-
-        # 回傳結果給前端
+        #儲存結果到 Firebase
+        #record = {
+        #    "text_id": text_id,
+        #    "text": request.text,
+        #    "user_id": request.user_id,
+        #    "analysis_result": {
+        #        "status": result["status"],
+        #        "confidence": result["confidence"],
+        #        "suspicious_keywords": result["suspicious_keywords"],
+        #    },
+        #    "timestamp": datetime.now(),
+        #    "type": "text_analysis"
+        #}
+        #try:
+        #    db.collection("text_analyses").document(text_id).set(record)
+        #except Exception as e:
+        #    print(f"警告：Firebase 寫入失敗：{e}")
+        
+        # 回傳結果給前端。對應script.js第60段註解。
+        # status、confidence、suspicious_keywords在script.js、app.py和bert_explainer是對應的變數，未來有需大更動，必須注意一致性。
         return TextAnalysisResponse(
             status=result["status"],
             confidence=result["confidence"],
             suspicious_keywords=result["suspicious_keywords"],
             analysis_timestamp=datetime.now(),
-            text_id=text_id
+            #text_id=text_id
         )
-
-    except Exception as e:
+#except Exception as e:
         # 若中途錯誤，拋出 HTTP 500 錯誤並附上錯誤訊息
-        raise HTTPException(status_code=500, detail=str(e))
+#        raise HTTPException(status_code=500, detail=str(e))
+
+    

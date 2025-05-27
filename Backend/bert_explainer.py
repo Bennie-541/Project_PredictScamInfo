@@ -13,7 +13,7 @@ import re
 import os
 import requests
 
-from AI_Model_architecture import BertLSTM_CNN_Classifier 
+from Backend.AI_Model_architecture import BertLSTM_CNN_Classifier 
 from transformers import BertTokenizer
 
 
