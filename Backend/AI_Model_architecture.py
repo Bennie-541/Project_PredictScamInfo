@@ -21,8 +21,7 @@
 """#引入重要套件Import Library
 import torch                            #   PyTorch 主模組               
 import torch.nn as nn                   #	神經網路相關的層（例如 LSTM、Linear）
-import torch.nn.functional as F         #   提供純函式版的操作方法，像是 F.relu()、F.cross_entropy()，通常不帶參數、不自動建立權重
-import numpy as np                      
+import torch.nn.functional as F         #   提供純函式版的操作方法，像是 F.relu()、F.cross_entropy()，通常不帶參數、不自動建立權重                    
 import pandas as pd
 import os
 #GPU不夠使用此選項
@@ -30,7 +29,6 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:16"#讓 CUDA 使用�
 import re
 
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset #	提供 Dataset、DataLoader 類別
 from transformers import BertTokenizer
