@@ -83,6 +83,7 @@ class TextAnalysisResponse(BaseModel):
 # "/" 是網址的根路徑，例如開啟："http://localhost:8000/"就會觸發這段程式。
 # 程式碼中/是API的根路徑。@app.get("/")代表使用者訪問網站最基本的路徑：http://localhost:8000/。這個/是URL路徑的根，不是資料夾。
 @app.get("/")
+
 # 宣告一個非同步函數 root()，FastAPI 支援 async，
 # 寫出高效能的非同步處理（像連資料庫、外部 API 等）
 # 雖然這裡只是回傳資料，但仍建議保留 async      
