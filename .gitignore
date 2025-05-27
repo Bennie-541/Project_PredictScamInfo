@@ -1,2 +1,23 @@
-backend/firebase-credentials.json
-firebase-credentials.json
+# 忽略模型與機密
+*.pth
+*.json
+
+# 忽略 Python 快取
+__pycache__/
+*.py[cod]
+
+# 忽略環境與日誌
+.env
+*.log
+
+# 忽略大型 Excel（你只保留 CSV）
+*.xlsx
+
+# 若只排除特定大資料檔，而不是整個資料夾，請用以下格式
+# ! 表示例外（白名單）
+
+# 忽略整個 data 資料夾，但允許 .csv 檔案
+data/*
+!data/*.csv
+
+bfg-*.jar
