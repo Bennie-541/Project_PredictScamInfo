@@ -36,7 +36,7 @@ from fastapi.middleware.cors import CORSMiddleware           # 匯入 CORS 模�
 from pydantic import BaseModel                               # 用於定義 API 的資料結構模型
 from datetime import datetime                                # 處理時間格式（如分析時間戳）
 from typing import Optional, List                            # 型別註解：可選、列表
-from Backend.bert_explainer import analyze_text as bert_analyze_text # 匯入自定義的 BERT 模型分析函式
+from Backend.bert_explainer import analyze_text  # 匯入自定義的 BERT 模型分析函式
 from firebase_admin import credentials, firestore            # Firebase 管理工具
 import firebase_admin
 
@@ -71,12 +71,12 @@ class TextAnalysisResponse(BaseModel):
     text_id: str                     # 系統自動產生 ID(偏向資料庫用途，目前用不到)
 
 # ---------------- 初始化 Firebase ----------------
-try:#這是資料庫暫時不會用到
-    cred = credentials.Certificate("firebase-credentials.json")
-    firebase_admin.initialize_app(cred)
-    db = firestore.client()  # 建立資料庫 client
-except Exception as e:
-    print(f"Firebase 初始化錯誤: {e}")
+#try:#這是資料庫暫時不會用到
+#    cred = credentials.Certificate("firebase-credentials.json")
+#    firebase_admin.initialize_app(cred)
+#    db = firestore.client()  # 建立資料庫 client
+#except Exception as e:
+#    print(f"Firebase 初始化錯誤: {e}")
 
 # ---------------- 根目錄測試 API ----------------
 # 這是 FastAPI 的路由裝飾器，代表：當使用者對「根目錄 /」發送 HTTP GET 請求時，要執行下面這個函數。
@@ -106,8 +106,7 @@ async def analyze_text_api(request: TextAnalysisRequest):
         # try:
         # 建立唯一分析 ID：以時間+使用者組成
         # text_id = f"TXT_{datetime.now().strftime('%Y%m%d%H%M%S')}_{request.user_id or 'anonymous'}"
-        
-    
+
         # 使用模型分析該文字（實際邏輯在 bert_explainer.py）
         # 呼叫模型進行詐騙分析，這會呼叫模型邏輯(在bert_explainer.py），把輸入文字送去分析，得到像這樣的回傳結果(假設)：
         #result = {
@@ -115,7 +114,7 @@ async def analyze_text_api(request: TextAnalysisRequest):
         #    "confidence": 0.93,
         #    "suspicious_keywords": ["繳費", "網址", "限時"]
         #}
-        result = bert_analyze_text(request.text)
+        result = analyze_text(request.text)
 
         #儲存結果到 Firebase
         #record = {

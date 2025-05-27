@@ -38,7 +38,9 @@ load_dotenv()
 base_dir = os.getenv("DATA_DIR", "./data")  # 如果沒設環境變數就預設用 ./data
 
 # ------------------- 使用相對路徑找 CSV -------------------
-csv_files = [os.path.join(base_dir, "NorANDScamInfo_data3k.csv"),os.path.join(base_dir, "NorANDScamInfo_data1.csv"),os.path.join(base_dir, "ScamInfo_data1.csv"),os.path.join(base_dir, "NormalInfo_data1.csv")]
+#,os.path.join(base_dir, "NorANDScamInfo_data1.csv"),os.path.join(base_dir, "ScamInfo_data1.csv"),os.path.join(base_dir, "NormalInfo_data1.csv")
+#如有需要訓練複數筆資料可以使用這個方法csv_files = [os.path.join(base_dir, "檔案名稱1.csv"),os.path.join(base_dir, "檔案名稱2.csv")]
+csv_files = [os.path.join(base_dir, "NorANDScamInfo_data3k.csv")]
 
 # GPU 記憶體限制（可選）
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:16"
@@ -181,8 +183,15 @@ model = BertLSTM_CNN_Classifier().to(device)
 optimizer = torch.optim.Adam(model.parameters(),lr=2e-5)
 criterion = nn.BCELoss()
 
-# 訓練迴圈
+#只保留推論即可，模型訓練應該在本地完成！
+if os.path.exists("model.pth"):
+    print("✅ 已找到 model.pth，載入模型跳過訓練")
+    model.load_state_dict(torch.load("model.pth", map_location=device))
+else:
+    print("❌ 未找到 model.pth，Render 免費環境不允許訓練")
 
+# 本機訓練迴圈，要訓練再取消註解，否則在線上版本一律處於註解狀態
+"""
 if __name__ == "__main__":
     if os.path.exists("model.pth"):
         print("✅ 已找到 model.pth，載入模型跳過訓練")
@@ -208,4 +217,5 @@ if __name__ == "__main__":
             print(f"[Epoch{epoch+1}]Training Loss:{total_loss:.4f}")
         torch.save(model.state_dict(), "model.pth")# 儲存模型權重
         print("✅ 模型訓練完成並儲存為 model.pth")
+"""
 

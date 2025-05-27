@@ -71,55 +71,64 @@ tokenizer = BertTokenizer.from_pretrained("ckiplab/bert-base-chinese")
 all_preds = []
 all_labels = []
 
+# 預測單一句子的分類結果（詐騙 or 正常）
+# model: 訓練好的PyTorch模型
+# tokenizer: 分詞器，負責把中文轉成 BERT 能處理的數值格式
+# sentence: 使用者輸入的文字句子
+# max_len: 限制最大輸入長度（預設 256 個 token）
 def predict_single_sentence(model, tokenizer, sentence, max_len=256):
-    model.eval()
+    model.eval()# 將模型切換成「推論模式」，會關掉 dropout 等隨機操作
+    
+    # 使用 with torch.no_grad()，代表這段程式「不需要記錄梯度」
+    # 這樣可以加速推論並節省記憶體
     with torch.no_grad():
-        # 清洗文字
-        sentence = re.sub(r"\s+", "", sentence)
+         # ----------- 文字前處理：清洗輸入句子 -----------
+        sentence = re.sub(r"\s+", "", sentence)  # 移除所有空白字元（空格、換行等）
         sentence = re.sub(r"[^\u4e00-\u9fffA-Za-z0-9。，！？]", "", sentence)
-
-        # 編碼
+        # 保留常見中文字、英數字與標點符號，其他奇怪符號都移除
+        # ----------- 使用 BERT Tokenizer 將句子編碼 -----------
         encoded = tokenizer(sentence,
-                            return_tensors="pt",
-                            truncation=True,
-                            padding="max_length",
-                            max_length=max_len)
-
+                            return_tensors="pt",       # 回傳 PyTorch tensor 格式（預設是 numpy 或 list）
+                            truncation=True,           # 超過最大長度就截斷
+                            padding="max_length",      # 不足最大長度則補空白（PAD token）
+                            max_length=max_len)        # 設定最大長度為 256
+        # 把 tokenizer 回傳的資料送進模型前，to(device)轉到指定的裝置（GPU or CPU）
         input_ids = encoded["input_ids"].to(device)
         attention_mask = encoded["attention_mask"].to(device)
         token_type_ids = encoded["token_type_ids"].to(device)
-
-        # 預測
-        output = model(input_ids, attention_mask, token_type_ids)
-        prob = output.item()
-        label = int(prob > 0.5)
-
-        # 風險分級顯示
+        # ----------- 模型推論：輸出詐騙的機率值 -----------
+        output = model(input_ids, attention_mask, token_type_ids)# 回傳的是一個機率值（float）
+        prob = output.item()  # 從 tensor 取出純數字，例如 0.86
+        label = int(prob > 0.5)  # 如果機率 > 0.5，標為「詐騙」（1），否則為「正常」（0）
+        # ----------- 根據機率進行風險分級 -----------
         if prob > 0.9:
             risk = "🔴 高風險（極可能是詐騙）"
         elif prob > 0.5:
             risk = "🟡 中風險（可疑）"
         else:
             risk = "🟢 低風險（正常）"
-
-        pre_label = ""
-        if label == 1:
-            pre_label = '詐騙'
-        else:
-            pre_label = '正常'
-   
+        # ----------- 根據 label 判斷文字結果 -----------
+        pre_label ='詐騙'if label == 1 else '正常'
+        # ----------- 顯示推論資訊（後端終端機） -----------
         print(f"\n📩 訊息內容：{sentence}")
         print(f"✅ 預測結果：{'詐騙' if label == 1 else '正常'}")
         print(f"📊 信心值：{round(prob*100, 2)}")
         print(f"⚠️ 風險等級：{risk}")
+        # ----------- 回傳結果給呼叫端（通常是 API） -----------
         return pre_label, prob, risk
 
+# analyze_text(text)對應app.py第117行
+# 這個函式是「對外的簡化版本」：輸入一句文字 → 回傳詐騙判定結果
+# 用在主程式或 FastAPI 後端中，是整個模型預測流程的入口點
 
 def analyze_text(text):
+    # 呼叫前面定義好的 predict_single_sentence()
+    # 傳入模型、tokenizer、輸入文字 → 回傳三項結果
     label, prob, risk = predict_single_sentence(model, tokenizer, text)
+    # 組成一個 Python 字典（對應 API 的 JSON 輸出格式）
     return {
-        "status": label,
-        "confidence": round(prob*100, 2),  
-        "suspicious_keywords": [risk]
+        "status": label,                  # 預測分類（"詐騙" or "正常"）
+        "confidence": round(prob*100, 2), # 預測分類（"詐騙" or "正常"）  
+        "suspicious_keywords": [risk]     # 用風險分級當作"可疑提示"放進 list（名稱為 suspicious_keywords）
     }
 
