@@ -1,11 +1,24 @@
-# 忽略模型與機密
-*.pth
-*.json
-
-# 忽略 Python 快取
+# 排除 Python 自動產生的暫存檔案
 __pycache__/
 *.py[cod]
-
-# 忽略環境與日誌
-.env
+*.pkl
 *.log
+*.pth
+
+# 排除模型與訓練快照檔案
+model.pth
+*.pt
+
+# 排除 VSCode 設定檔與 Jupyter Checkpoint
+.vscode/
+.ipynb_checkpoints/
+
+# 排除 Firebase 憑證
+firebase-credentials.json
+
+# 忽略整個 data 資料夾，但允許 .csv 檔案
+data/*
+!data/*.csv
+
+# 排除 git 清理工具
+bfg-*.jar

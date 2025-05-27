@@ -1,4 +1,5 @@
-"""流程圖
+"""
+流程圖
 讀取資料 → 分割資料 → 編碼 → 建立 Dataset / DataLoader
 ↓
 建立模型（BERT+LSTM+CNN）
@@ -36,7 +37,6 @@ from transformers import BertTokenizer
 from sklearn.model_selection import train_test_split
 from transformers import BertModel
 #BertTokenizer	把文字句子轉換成 BERT 格式的 token ID，例如 [CLS] 今天 天氣 不錯 [SEP] → [101, 1234, 5678, ...]
-##BertForSequenceClassification	是 Hugging Face 提供的一個完整 BERT 模型，接了分類用的 Linear 層，讓你直接拿來做分類任務（例如詐騙 vs 正常）
 
 
 #正常訊息資料集在這新增
