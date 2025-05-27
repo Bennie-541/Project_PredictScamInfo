@@ -18,31 +18,30 @@
 ↓
 儲存模型（.pth）
 
-"""#引入重要套件Import Library
-import torch                            #   PyTorch 主模組               
-import torch.nn as nn                   #	神經網路相關的層（例如 LSTM、Linear）
-import torch.nn.functional as F         #   提供純函式版的操作方法，像是 F.relu()、F.cross_entropy()，通常不帶參數、不自動建立權重                    
-import pandas as pd
+"""
+#引入重要套件Import Library
 import os
-#GPU不夠使用此選項
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:16"#讓 CUDA 使用「更小記憶體分配塊」的方法，能有效減少 OOM 錯誤。
+import torch                            #   PyTorch 主模組               
+import torch.nn as nn                   #	神經網路相關的層（例如 LSTM、Linear）         
+import pandas as pd
 import re
 
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from dotenv import load_dotenv
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset #	提供 Dataset、DataLoader 類別
-from transformers import BertTokenizer
+from transformers import BertTokenizer # BertTokenizer把文字句子轉換成 BERT 格式的 token ID，例如 [CLS] 今天 天氣 不錯 [SEP] → [101, 1234, 5678, ...]
 from sklearn.model_selection import train_test_split
 from transformers import BertModel
-#BertTokenizer	把文字句子轉換成 BERT 格式的 token ID，例如 [CLS] 今天 天氣 不錯 [SEP] → [101, 1234, 5678, ...]
 
+# ------------------- 載入 .env 環境變數 -------------------
+load_dotenv()
+base_dir = os.getenv("DATA_DIR", "./data")  # 如果沒設環境變數就預設用 ./data
 
-#正常訊息資料集在這新增
-normal_files = [r"D:\Project_PredictScamInfo\data\NormalInfo_data1.csv"]
+# ------------------- 使用相對路徑找 CSV -------------------
+csv_files = [os.path.join(base_dir, "NorANDScamInfo_data3k.csv"),os.path.join(base_dir, "NorANDScamInfo_data1.csv"),os.path.join(base_dir, "ScamInfo_data1.csv"),os.path.join(base_dir, "NormalInfo_data1.csv")]
 
-#詐騙訊息資料集在這新增
-scam_files = [
-    r"D:\Project_PredictScamInfo\data\ScamInfo_data1.csv"]
+# GPU 記憶體限制（可選）
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:16"
 
 #資料前處理
 class BertPreprocessor:
@@ -70,21 +69,23 @@ class BertPreprocessor:
             max_length=self.max_len
         )
 #自動做資料前處理
-def build_bert_inputs(normal_files, scam_files):
+def build_bert_inputs(files):
     #將正常與詐騙資料分別指定 label，統一清理、編碼，回傳模型可用的 input tensors 與 labels。
     processor = BertPreprocessor()
     dfs = []
     # 合併正常 + 詐騙檔案清單
-    all_files = normal_files + scam_files
+    all_files = files
 
     for filepath in all_files:
         df = processor.load_and_clean(filepath)
         dfs.append(df)
-
+    
     # 合併所有資料。在資料清理過程中dropna()：刪除有空值的列，drop_duplicates()：刪除重複列，filter()或df[...]做條件過濾，concat():將多個 DataFrame合併
     # 這些操作不會自動重排索引，造成索引亂掉。
     # 合併後統一編號（常見於多筆資料合併）all_df = pd.concat(dfs, 關鍵-->ignore_index=True)
     all_df = pd.concat(dfs, ignore_index=True)
+    print(f"✅ 已讀入 {len(all_df)} 筆資料")
+    print(all_df["label"].value_counts())
     #製作 train/val 資料集
     train_texts, val_texts, train_labels, val_labels = train_test_split(
     all_df["message"], all_df["label"],
@@ -101,8 +102,8 @@ def build_bert_inputs(normal_files, scam_files):
     return train_inputs, train_labels, val_inputs, val_labels, processor
 
 #AUTO YA~以for迴圈自動新增個別變數內，build_bert_inputs能自動擷取新增資料
-normal_files_labels = [normal for normal in normal_files] 
-scam_files_labels = [scam for scam in scam_files] 
+#normal_files_labels = [normal for normal in normal_files] 
+#scam_files_labels = [scam for scam in scam_files] 
 
 #print(bert_inputs.keys())
 
@@ -126,7 +127,7 @@ class ScamDataset(Dataset):
         }
 
 # 這樣可以同時處理 scam 和 normal 資料，不用重複寫清理與 token 處理
-train_inputs, train_labels, val_inputs, val_labels, processor = build_bert_inputs(normal_files, scam_files)
+train_inputs, train_labels, val_inputs, val_labels, processor = build_bert_inputs(csv_files)
 
 train_dataset = ScamDataset(train_inputs, train_labels)
 val_dataset = ScamDataset(val_inputs, val_labels)

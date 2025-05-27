@@ -2,13 +2,15 @@
 #pip install torch         //transformers 套件需要
 #pip install scikit-learn
 #pip install transformers torch
-#
-# bert_explainer.py
 
-
-#引入重要套件Import Library
-import torch                            #   PyTorch 主模組               
-import torch
+# 引入重要套件Import Library
+# PyTorch 主模組，和Tensorflow很像 
+# 共通點：都是深度學習框架，支援建構神經網路、訓練與推論，都支援GPU加速、載入模型，和處理tensor等。
+# 操作比較直覺，接近Python本身的風格，動態圖架構(每一次forward都即時計算)，更容易除錯、快速迭代，在研究領域非常流行。
+# re是Python內建的正則表示式(regular expression)模組，在這專案中用來"用關鍵規則篩選文字內容"。
+# requests是一個非常好用的 HTTP 請求套件，能讓你從Python發送GET/POST請求，在專案中用來從Google Drive下載模型檔案(model.pth)。
+# BertTokenizer:從Hugging Face的transformers套件載入一個專用的「分詞器（Tokenizer）」。
+import torch                
 import re
 import os
 import requests
@@ -61,7 +63,9 @@ model.to(device)
 # 只要是用來「預測」而不是訓練，一定要加 .eval()！
 model.eval()
 
-# 初始化 tokenizer（不要從 build_bert_inputs 中取）
+# 初始化 tokenizer(不要從 build_bert_inputs 中取)
+# 載入預訓練好的CKIP中文BERT分詞器
+# 能把中文句子轉成 BERT 模型需要的 input 格式（input_ids, attention_mask, token_type_ids）
 tokenizer = BertTokenizer.from_pretrained("ckiplab/bert-base-chinese")
 
 all_preds = []
