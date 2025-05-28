@@ -75,7 +75,7 @@ class TextAnalysisResponse(BaseModel):
     confidence: float                # 信心分數（通常為 100~0）
     suspicious_keywords: List[str]   # 可疑詞語清單(目前只會回傳風險分級顯示)
     analysis_timestamp: datetime     # 分析完成時間(偏向資料庫用途，目前沒用到)
-    text_id: str                     # 系統自動產生 ID(偏向資料庫用途，目前用不到)
+    #text_id: str                     # 系統自動產生 ID(偏向資料庫用途，目前用不到)
 
 # ---------------- 初始化 Firebase ----------------
 #try:#這是資料庫暫時不會用到
@@ -97,6 +97,7 @@ async def read_index():
 # 雖然這裡只是回傳資料，但仍建議保留 async      
 # Q:什麼是"非同步函數"(async def)？A:因為有些操作「會花時間」：等後端模型處理，等資料庫查詢，等外部 API 回應。用於處理"等待型操作"如資料庫、模型等。
 # 還有保留 async 可以讓你未來擴充時不用重構。
+@app.get("/api-status")
 async def root():
 # 這是回傳給前端或使用者的一段 JSON 格式資料(其實就是 Python 的 dict)
     return {
@@ -105,13 +106,14 @@ async def root():
         "status": "active", # 標示服務是否運行中（通常是 active 或 down）
         "docs": "/docs"     # 告訴使用者：自動生成的 API 文件在 /docs
 # Q:/docs 是什麼？A:FastAPI 自動幫你建一個文件頁：看每個 API 的用途、參數格式
-    }
+    }   
 
 # ---------------- 主要 /predict 預測端點 ----------------
 # 當前端呼叫這個 API，並傳入一段文字時，這段程式會依序做以下事情：
 # 程式碼內有特別註解掉資料庫部份，因為目前資料庫對該專案並不是特別重要，所以註解的方式，避免再Render佈署前後端網頁時出錯。
 @app.post("/predict", response_model=TextAnalysisResponse)
 async def analyze_text_api(request: TextAnalysisRequest):
+
         # try:
         # 建立唯一分析 ID：以時間+使用者組成
         # text_id = f"TXT_{datetime.now().strftime('%Y%m%d%H%M%S')}_{request.user_id or 'anonymous'}"
@@ -145,13 +147,21 @@ async def analyze_text_api(request: TextAnalysisRequest):
         
         # 回傳結果給前端。對應script.js第60段註解。
         # status、confidence、suspicious_keywords在script.js、app.py和bert_explainer是對應的變數，未來有需大更動，必須注意一致性。
-        return TextAnalysisResponse(
+        try:
+            print("📥 收到請求：", request.text)
+            result = analyze_text(request.text)
+            print("✅ 模型回傳結果：", result)
+            return TextAnalysisResponse(
             status=result["status"],
             confidence=result["confidence"],
             suspicious_keywords=result["suspicious_keywords"],
             analysis_timestamp=datetime.now(),
-            #text_id=text_id
+            #text_id=str
         )
+        except Exception as e:
+            print("❌ analyze_text_api 發生錯誤：", str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+        
 #except Exception as e:
         # 若中途錯誤，拋出 HTTP 500 錯誤並附上錯誤訊息
 #        raise HTTPException(status_code=500, detail=str(e))

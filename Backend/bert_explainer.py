@@ -40,22 +40,22 @@ def load_model_and_tokenizer():
     model_path = os.path.join(os.path.dirname(__file__), "model.pth")
     file_id = "19t6NlRFMc1i8bGtngRwIRtRcCmibdP9q"
     
-    download_model_from_Gdrive(file_id, model_path)
+
 
     # Google Drive 模型檔案 ID 與儲存路徑
     # 這是一個函式，讓你自動從 Google Drive 抓下模型檔案 .pth。
     # file_id: 你從 Google Drive 拿到的模型 ID
     # destination: 你要儲存的本地檔案路徑（例如 "model.pth"）
-    def download_model_from_Gdrive(file_id, destination):#Model.pth連結(https://drive.google.com/file/d/19t6NlRFMc1i8bGtngRwIRtRcCmibdP9q/view?usp=drive_link)
+#Model.pth連結(https://drive.google.com/file/d/19t6NlRFMc1i8bGtngRwIRtRcCmibdP9q/view?usp=drive_link)
         # url變數用來產生真正的「直接下載連結」file_id預設是Google雲端裡的model.pth檔案id，讓程式能下載model.pth
-        url = f"https://drive.google.com/uc?export=download&id={file_id}"  
-        if not os.path.exists(destination):   # 如果本地還沒有這個檔案 → 才下載（避免重複）
+    url = f"https://drive.google.com/uc?export=download&id={file_id}"  
+    if not os.path.exists(model_path):   # 如果本地還沒有這個檔案 → 才下載（避免重複）
             print("📥 Downloading model from Google Drive...")
             r = requests.get(url)             # 用requests發送GET請求到Google Drive
-            with open(destination, 'wb')as f: # 把下載的檔案內容寫入到 model.pth 本地檔案
+            with open(model_path, 'wb')as f: # 把下載的檔案內容寫入到 model.pth 本地檔案
                 f.write(r.content)
                 print("✅ Model downloaded.")     
-        else:
+    else:
             print("📦 Model already exists.")
 
     # 設定裝置（GPU 優先）
@@ -114,7 +114,7 @@ def predict_single_sentence(model, tokenizer, sentence, max_len=256):
         attention_mask = encoded["attention_mask"].to(device)
         token_type_ids = encoded["token_type_ids"].to(device)
         # ----------- 模型推論：輸出詐騙的機率值 -----------
-        output = model.forward(input_ids, attention_mask, token_type_ids)# 回傳的是一個機率值（float）
+        output = model(input_ids, attention_mask, token_type_ids)# 回傳的是一個機率值（float）
         prob = output.item()  # 從 tensor 取出純數字，例如 0.86
         label = int(prob > 0.5)  # 如果機率 > 0.5，標為「詐騙」（1），否則為「正常」（0）
         # ----------- 根據機率進行風險分級 -----------
