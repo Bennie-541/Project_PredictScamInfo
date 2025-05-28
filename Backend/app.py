@@ -37,8 +37,7 @@ from pydantic import BaseModel                               # 用於定義 API 
 from datetime import datetime                                # 處理時間格式（如分析時間戳）
 from typing import Optional, List                            # 型別註解：可選、列表
 from Backend.bert_explainer import analyze_text  # 匯入自定義的 BERT 模型分析函式
-from firebase_admin import credentials, firestore            # Firebase 管理工具
-#import firebase_admin
+
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
@@ -75,17 +74,7 @@ class TextAnalysisResponse(BaseModel):
     confidence: float                # 信心分數（通常為 100~0）
     suspicious_keywords: List[str]   # 可疑詞語清單(目前只會回傳風險分級顯示)
     analysis_timestamp: datetime     # 分析完成時間(偏向資料庫用途，目前沒用到)
-    #text_id: str                     # 系統自動產生 ID(偏向資料庫用途，目前用不到)
 
-# ---------------- 初始化 Firebase ----------------
-#try:#這是資料庫暫時不會用到
-#    cred = credentials.Certificate("firebase-credentials.json")
-#    firebase_admin.initialize_app(cred)
-#    db = firestore.client()  # 建立資料庫 client
-#except Exception as e:
-#    print(f"Firebase 初始化錯誤: {e}")
-
-# ---------------- 根目錄測試 API ----------------
 # 這是 FastAPI 的路由裝飾器，代表：當使用者對「根目錄 /」發送 HTTP GET 請求時，要執行下面這個函數。
 # "/" 是網址的根路徑，例如開啟："http://localhost:8000/"就會觸發這段程式。
 # 程式碼中/是API的根路徑。@app.get("/")代表使用者訪問網站最基本的路徑：http://localhost:8000/。這個/是URL路徑的根，不是資料夾。
@@ -97,6 +86,7 @@ async def read_index():
 # 雖然這裡只是回傳資料，但仍建議保留 async      
 # Q:什麼是"非同步函數"(async def)？A:因為有些操作「會花時間」：等後端模型處理，等資料庫查詢，等外部 API 回應。用於處理"等待型操作"如資料庫、模型等。
 # 還有保留 async 可以讓你未來擴充時不用重構。
+# ---------------- 根目錄測試 API ----------------
 @app.get("/api-status")
 async def root():
 # 這是回傳給前端或使用者的一段 JSON 格式資料(其實就是 Python 的 dict)
@@ -114,10 +104,6 @@ async def root():
 @app.post("/predict", response_model=TextAnalysisResponse)
 async def analyze_text_api(request: TextAnalysisRequest):
 
-        # try:
-        # 建立唯一分析 ID：以時間+使用者組成
-        # text_id = f"TXT_{datetime.now().strftime('%Y%m%d%H%M%S')}_{request.user_id or 'anonymous'}"
-
         # 使用模型分析該文字（實際邏輯在 bert_explainer.py）
         # 呼叫模型進行詐騙分析，這會呼叫模型邏輯(在bert_explainer.py），把輸入文字送去分析，得到像這樣的回傳結果(假設)：
         #result = {
@@ -126,25 +112,7 @@ async def analyze_text_api(request: TextAnalysisRequest):
         #    "suspicious_keywords": ["繳費", "網址", "限時"]
         #}
         result = analyze_text(request.text)
-
-        #儲存結果到 Firebase
-        #record = {
-        #    "text_id": text_id,
-        #    "text": request.text,
-        #    "user_id": request.user_id,
-        #    "analysis_result": {
-        #        "status": result["status"],
-        #        "confidence": result["confidence"],
-        #        "suspicious_keywords": result["suspicious_keywords"],
-        #    },
-        #    "timestamp": datetime.now(),
-        #    "type": "text_analysis"
-        #}
-        #try:
-        #    db.collection("text_analyses").document(text_id).set(record)
-        #except Exception as e:
-        #    print(f"警告：Firebase 寫入失敗：{e}")
-        
+     
         # 回傳結果給前端。對應script.js第60段註解。
         # status、confidence、suspicious_keywords在script.js、app.py和bert_explainer是對應的變數，未來有需大更動，必須注意一致性。
         try:
@@ -156,14 +124,9 @@ async def analyze_text_api(request: TextAnalysisRequest):
             confidence=result["confidence"],
             suspicious_keywords=result["suspicious_keywords"],
             analysis_timestamp=datetime.now(),
-            #text_id=str
         )
         except Exception as e:
-            print("❌ analyze_text_api 發生錯誤：", str(e))
-            raise HTTPException(status_code=500, detail=str(e))
+            print("❌ 錯誤訊息：", str(e))
+            raise HTTPException(status_code=500, detail="內部伺服器錯誤")
         
-#except Exception as e:
-        # 若中途錯誤，拋出 HTTP 500 錯誤並附上錯誤訊息
-#        raise HTTPException(status_code=500, detail=str(e))
-
     

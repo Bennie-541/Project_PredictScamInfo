@@ -17,16 +17,15 @@ import requests
 
 from transformers import BertTokenizer
 
+# 設定裝置（GPU 優先）
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # 預設模型與 tokenizer 為 None，直到首次請求才載入（延遲載入）
 model = None
 tokenizer = None
 # ✅ 延遲載入模型與 tokenizer
 def load_model_and_tokenizer():
     global model, tokenizer
-
-    # 如果已經載入，就直接回傳，不重複載入
-    if model is not None and tokenizer is not None:
-        return model, tokenizer
+    model_path = os.path.join(os.path.dirname(__file__), "model.pth")
 
     # 匯入模型架構（避免在模組初始化階段就占用大量記憶體）
     from Backend.AI_Model_architecture import BertLSTM_CNN_Classifier
@@ -37,11 +36,9 @@ def load_model_and_tokenizer():
     # os.path.join(資料夾,"model.pth")把資料夾+檔名「安全地合併」，變成完整路徑(跨平台兼容)
     # __file__是Python內建變數，代表「目前這支程式碼的檔案路徑」
     # os.path.dirname(__file__)取得這支.py 檔的「資料夾路徑」
-    model_path = os.path.join(os.path.dirname(__file__), "model.pth")
-    file_id = "19t6NlRFMc1i8bGtngRwIRtRcCmibdP9q"
     
 
-
+    file_id = "19t6NlRFMc1i8bGtngRwIRtRcCmibdP9q"
     # Google Drive 模型檔案 ID 與儲存路徑
     # 這是一個函式，讓你自動從 Google Drive 抓下模型檔案 .pth。
     # file_id: 你從 Google Drive 拿到的模型 ID
@@ -58,8 +55,7 @@ def load_model_and_tokenizer():
     else:
             print("📦 Model already exists.")
 
-    # 設定裝置（GPU 優先）
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     
     # 載入模型架構與參數，初始化模型架構並載入訓練權重
     model = BertLSTM_CNN_Classifier()
