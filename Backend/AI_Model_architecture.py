@@ -40,7 +40,7 @@ base_dir = os.getenv("DATA_DIR", "./data")  # 如果沒設環境變數就預設�
 # ------------------- 使用相對路徑找 CSV -------------------
 #,os.path.join(base_dir, "NorANDScamInfo_data1.csv"),os.path.join(base_dir, "ScamInfo_data1.csv"),os.path.join(base_dir, "NormalInfo_data1.csv")
 #如有需要訓練複數筆資料可以使用這個方法csv_files = [os.path.join(base_dir, "檔案名稱1.csv"),os.path.join(base_dir, "檔案名稱2.csv")]
-csv_files = [os.path.join(base_dir, "NorANDScamInfo_data3k.csv")]
+#程式碼一至131行
 
 # GPU 記憶體限制（可選）
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:16"
@@ -129,7 +129,9 @@ class ScamDataset(Dataset):
         }
 
 # 這樣可以同時處理 scam 和 normal 資料，不用重複寫清理與 token 處理
-train_inputs, train_labels, val_inputs, val_labels, processor = build_bert_inputs(csv_files)
+if __name__ == "__main__":
+    csv_files = [os.path.join(base_dir, "NorANDScamInfo_data3k.csv")]
+    train_inputs, train_labels, val_inputs, val_labels, processor = build_bert_inputs(csv_files)
 
 train_dataset = ScamDataset(train_inputs, train_labels)
 val_dataset = ScamDataset(val_inputs, val_labels)
