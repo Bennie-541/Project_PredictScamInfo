@@ -132,12 +132,14 @@ class ScamDataset(Dataset):
 if __name__ == "__main__":
     csv_files = [os.path.join(base_dir, "NorANDScamInfo_data3k.csv")]
     train_inputs, train_labels, val_inputs, val_labels, processor = build_bert_inputs(csv_files)
+    
+    train_dataset = ScamDataset(train_inputs, train_labels)
+    val_dataset = ScamDataset(val_inputs, val_labels)
 
-train_dataset = ScamDataset(train_inputs, train_labels)
-val_dataset = ScamDataset(val_inputs, val_labels)
+    train_loader = DataLoader(train_dataset, batch_size=8)
+    val_loader = DataLoader(val_dataset, batch_size=8)
 
-train_loader = DataLoader(train_dataset, batch_size=8)
-val_loader = DataLoader(val_dataset, batch_size=8)
+
 
 #模型
 class BertLSTM_CNN_Classifier(nn.Module):
