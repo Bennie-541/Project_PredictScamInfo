@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 後端 FastAPI API 的 URL
     // 在開發階段，通常是 http://127.0.0.1:8000 或 http://localhost:8000
     // 請根據你實際運行 FastAPI 的位址和 Port 進行設定
-    const API_URL = 'http://127.0.0.1:8000/predict'; 
+    const API_URL = "/predict"; 
 
     // --- 檢測按鈕點擊事件監聽器 ---
     // 當檢測按鈕被點擊時，執行非同步函數

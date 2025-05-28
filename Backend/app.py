@@ -38,7 +38,11 @@ from datetime import datetime                                # 處理時間格�
 from typing import Optional, List                            # 型別註解：可選、列表
 from Backend.bert_explainer import analyze_text  # 匯入自定義的 BERT 模型分析函式
 from firebase_admin import credentials, firestore            # Firebase 管理工具
-import firebase_admin
+#import firebase_admin
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+import os
 
 # ---------------- 初始化 FastAPI 應用 ---------------
 #團隊合作:前端工程師、測試人員知道你這API做什麼。會影響 /docs 文件清晰度與專案可讀性，在專案開發與交接時非常有用。
@@ -47,6 +51,9 @@ app = FastAPI(
     description="使用 BERT 模型分析輸入文字是否為詐騙內容",# 說明這個 API 的功能與用途
     version="1.0.0"             # 顯示版本，例如 v1.0.0
 )
+ㄎ
+app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend")), name="static")
+
 # ---------------- 設定 CORS（允許跨網域請求） ----------------
 #FastAPI提供的內建方法，，用來加入中介層(middleware)。在請求抵達API前，或回應送出前，先做某些處理的程式邏輯。
 #(Cross-Origin Resource Sharing)一個瀏覽器安全機制。當你的前端(http://localhost:3000)-
@@ -82,8 +89,9 @@ class TextAnalysisResponse(BaseModel):
 # 這是 FastAPI 的路由裝飾器，代表：當使用者對「根目錄 /」發送 HTTP GET 請求時，要執行下面這個函數。
 # "/" 是網址的根路徑，例如開啟："http://localhost:8000/"就會觸發這段程式。
 # 程式碼中/是API的根路徑。@app.get("/")代表使用者訪問網站最基本的路徑：http://localhost:8000/。這個/是URL路徑的根，不是資料夾。
-@app.get("/")
-
+@app.get("/", response_class=FileResponse)
+async def read_index():
+    return FileResponse(os.path.join(os.path.dirname(__file__), "..", "frontend", "index.html"))
 # 宣告一個非同步函數 root()，FastAPI 支援 async，
 # 寫出高效能的非同步處理（像連資料庫、外部 API 等）
 # 雖然這裡只是回傳資料，但仍建議保留 async      
