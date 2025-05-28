@@ -41,7 +41,6 @@ def load_model_and_tokenizer():
     file_id = "19t6NlRFMc1i8bGtngRwIRtRcCmibdP9q"
     
     download_model_from_Gdrive(file_id, model_path)
-    model = BertLSTM_CNN_Classifier()
 
     # Google Drive 模型檔案 ID 與儲存路徑
     # 這是一個函式，讓你自動從 Google Drive 抓下模型檔案 .pth。
@@ -115,7 +114,7 @@ def predict_single_sentence(model, tokenizer, sentence, max_len=256):
         attention_mask = encoded["attention_mask"].to(device)
         token_type_ids = encoded["token_type_ids"].to(device)
         # ----------- 模型推論：輸出詐騙的機率值 -----------
-        output = model(input_ids, attention_mask, token_type_ids)# 回傳的是一個機率值（float）
+        output = model.forward(input_ids, attention_mask, token_type_ids)# 回傳的是一個機率值（float）
         prob = output.item()  # 從 tensor 取出純數字，例如 0.86
         label = int(prob > 0.5)  # 如果機率 > 0.5，標為「詐騙」（1），否則為「正常」（0）
         # ----------- 根據機率進行風險分級 -----------
@@ -135,7 +134,7 @@ def predict_single_sentence(model, tokenizer, sentence, max_len=256):
         # ----------- 回傳結果給呼叫端（通常是 API） -----------
         # 組成一個 Python 字典（對應 API 的 JSON 輸出格式）
         return {
-        "status": label,                  # 預測分類（"詐騙" or "正常"）
+        "status": pre_label,                  # 預測分類（"詐騙" or "正常"）
         "confidence": round(prob*100, 2), # 預測分類（"詐騙" or "正常"）  
         "suspicious_keywords": [risk]     # 用風險分級當作"可疑提示"放進 list（名稱為 suspicious_keywords）
     }
