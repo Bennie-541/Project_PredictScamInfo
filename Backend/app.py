@@ -51,7 +51,7 @@ app = FastAPI(
     description="使用 BERT 模型分析輸入文字是否為詐騙內容",# 說明這個 API 的功能與用途
     version="1.0.0"             # 顯示版本，例如 v1.0.0
 )
-ㄎ
+
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend")), name="static")
 
 # ---------------- 設定 CORS（允許跨網域請求） ----------------
