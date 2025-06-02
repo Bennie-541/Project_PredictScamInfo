@@ -4,18 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>預測詐騙訊息</title>
-    <link rel="stylesheet" href="/static/style.css"><!-- 引入外部 CSS 樣式 -->
+    <link rel="stylesheet" href="style.css"><!-- 引入外部 CSS 樣式 -->
 </head>
 <body>
     <h1>檢查可疑訊息</h1><!-- <h1>字體最大標題，最小<h6>-->
 
     <div class="main-container"> 
+        
 <!-- 使用者輸入區塊。textarea文字輸入的區塊。placeholder文字尚未輸入時，預設的顯示內容，無法在網頁端編輯。maxlength限制最大自數-->
         <section id="input_area" class="panel">
             <textarea id="predict_info" placeholder="請輸入內容 (最多5000字)" maxlength="5000" ></textarea>
             <div class="button-group">
-                <button id="detect_button" type="submit">檢測！</button><!---->
+                <button id="detect_button" type="submit">檢測</button><!---->
                 <button id="clear_button" type="reset">清除</button>
+                <!-- 新增：選擇解釋模式 -->
+            <div class="mode-select-group">
+                <label for="modeSelect">語意解釋模式：</label>
+                <select id="modeSelect">
+                    <option value="cnn">快速檢測（CNN）</option>
+                    <option value="bert">語意分析（BERT Attention）</option>
+                    <option value="both">雙重檢測（CNN + BERT）</option>
+                </select>
+            </div>
             </div>
         </section>
         <!-- 顯示模型預測結果的區塊 -->
@@ -26,9 +36,9 @@
             <p><strong>模型預測可疑度：</strong> <span id="confidence_score">待檢測</span></p>
             <p><strong>可疑詞句分析：</strong></p>
             <div id="suspicious_phrases"><!--div和span一樣功用，差別在div能自動換行-->
-                <p>請輸入訊息並點擊「檢測！」按鈕。</p>
+                <p>請輸入訊息並點擊「檢測」按鈕。</p>
             </div>
         </section>
-    </div> <script src="/static/script.js"></script> <!-- 引入 JavaScript 檔案 -->
+    </div> <script src="script.js"></script> <!-- 引入 JavaScript 檔案 -->
 </body>
 </html>

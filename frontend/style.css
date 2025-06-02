@@ -155,6 +155,31 @@ button[type="reset"]:hover {
     color: #666;
     margin: 0; /* 移除預設 margin */
 }
+label[for="modeSelect"] {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #495057;
+  font-size: 15px;
+}
+
+#modeSelect {
+  width: 100%;
+  padding: 10px;
+  font-size: 15px;
+  border-radius: 6px;
+  border: 1px solid #adb5bd;
+  background-color: #ffffff;
+  margin-bottom: 20px;
+  transition: 0.2s;
+}
+
+#modeSelect:focus {
+  border-color: #74c0fc;
+  box-shadow: 0 0 0 0.1rem rgba(116, 192, 252, 0.25);
+  outline: none;
+}
+
 
 /* --- 響應式設計：當螢幕較小時，垂直排列 --- */
 @media (max-width: 768px) {

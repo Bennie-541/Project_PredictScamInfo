@@ -15,6 +15,8 @@ import re
 import os
 import requests
 
+
+from huggingface_hub import hf_hub_download
 from transformers import BertTokenizer
 
 # 設定裝置（GPU 優先）
@@ -25,26 +27,30 @@ tokenizer = None
 # ✅ 延遲載入模型與 tokenizer
 def load_model_and_tokenizer():
     global model, tokenizer
-    model_path = os.path.join(os.path.dirname(__file__), "model.pth")
-
+    model_path = hf_hub_download(repo_id="Bennie12/Bert-Lstm-Cnn-ScamDetecter", filename="model.pth")
     # 匯入模型架構（避免在模組初始化階段就占用大量記憶體）
-    from Backend.AI_Model_architecture import BertLSTM_CNN_Classifier
-    
-    # 在你 load 模型之前執行
-    # 這行是為了取得模型儲存路徑，確保即使換不同電腦或上雲部署也能正確找到檔案。
-    # 簡單講：這行就是「找到這支程式所在的資料夾，並指定那裡的 model.pth 檔案」
-    # os.path.join(資料夾,"model.pth")把資料夾+檔名「安全地合併」，變成完整路徑(跨平台兼容)
-    # __file__是Python內建變數，代表「目前這支程式碼的檔案路徑」
-    # os.path.dirname(__file__)取得這支.py 檔的「資料夾路徑」
-    
+    from AI_Model_architecture import BertLSTM_CNN_Classifier
+    """
+    def download_model():
+    url = "https://huggingface.co/Bennie12/Bert-Lstm-Cnn-ScamDecteter/resolve/main/model.pth"
+    save_path = "model.pth"
 
+    # 若檔案不存在才下載
+    if not os.path.exists(save_path):
+        print("正在從 Hugging Face 下載 model.pth ...")
+        response = requests.get(url)
+        with open(save_path, "wb") as f:
+            f.write(response.content)
+        print("下載完成 ✅")
+    else:
+        print("已存在 model.pth，略過下載")
+
+# 呼叫下載函式
+download_model()
+
+    """
     file_id = "19t6NlRFMc1i8bGtngRwIRtRcCmibdP9q"
-    # Google Drive 模型檔案 ID 與儲存路徑
-    # 這是一個函式，讓你自動從 Google Drive 抓下模型檔案 .pth。
-    # file_id: 你從 Google Drive 拿到的模型 ID
-    # destination: 你要儲存的本地檔案路徑（例如 "model.pth"）
-#Model.pth連結(https://drive.google.com/file/d/19t6NlRFMc1i8bGtngRwIRtRcCmibdP9q/view?usp=drive_link)
-        # url變數用來產生真正的「直接下載連結」file_id預設是Google雲端裡的model.pth檔案id，讓程式能下載model.pth
+    
     url = f"https://drive.google.com/uc?export=download&id={file_id}"  
     if not os.path.exists(model_path):   # 如果本地還沒有這個檔案 → 才下載（避免重複）
             print("📥 Downloading model from Google Drive...")
