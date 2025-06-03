@@ -1,7 +1,3 @@
-#pip install transformers
-#pip install torch         //transformers 套件需要
-#pip install scikit-learn
-#pip install transformers torch
 
 # 引入重要套件Import Library
 # PyTorch 主模組，和Tensorflow很像 
@@ -30,26 +26,8 @@ def load_model_and_tokenizer():
     model_path = hf_hub_download(repo_id="Bennie12/Bert-Lstm-Cnn-ScamDetecter", filename="model.pth")
     # 匯入模型架構（避免在模組初始化階段就占用大量記憶體）
     from AI_Model_architecture import BertLSTM_CNN_Classifier
-    """
-    def download_model():
-    url = "https://huggingface.co/Bennie12/Bert-Lstm-Cnn-ScamDecteter/resolve/main/model.pth"
-    save_path = "model.pth"
-
-    # 若檔案不存在才下載
-    if not os.path.exists(save_path):
-        print("正在從 Hugging Face 下載 model.pth ...")
-        response = requests.get(url)
-        with open(save_path, "wb") as f:
-            f.write(response.content)
-        print("下載完成 ✅")
-    else:
-        print("已存在 model.pth，略過下載")
-
-# 呼叫下載函式
-download_model()
-
-    """
-    file_id = "19t6NlRFMc1i8bGtngRwIRtRcCmibdP9q"
+        """
+      file_id = "19t6NlRFMc1i8bGtngRwIRtRcCmibdP9q"
     
     url = f"https://drive.google.com/uc?export=download&id={file_id}"  
     if not os.path.exists(model_path):   # 如果本地還沒有這個檔案 → 才下載（避免重複）
@@ -60,9 +38,7 @@ download_model()
                 print("✅ Model downloaded.")     
     else:
             print("📦 Model already exists.")
-
-    
-    
+    """
     # 載入模型架構與參數，初始化模型架構並載入訓練權重
     model = BertLSTM_CNN_Classifier()
     
@@ -136,20 +112,123 @@ def predict_single_sentence(model, tokenizer, sentence, max_len=256):
         # ----------- 回傳結果給呼叫端（通常是 API） -----------
         # 組成一個 Python 字典（對應 API 的 JSON 輸出格式）
         return {
-        "status": pre_label,                  # 預測分類（"詐騙" or "正常"）
-        "confidence": round(prob*100, 2), # 預測分類（"詐騙" or "正常"）  
-        "suspicious_keywords": [risk]     # 用風險分級當作"可疑提示"放進 list（名稱為 suspicious_keywords）
+        pre_label,                  # 預測分類（"詐騙" or "正常"）
+        prob, # 預測分類（"詐騙" or "正常"）  
+        risk     # 用風險分級當作"可疑提示"放進 list（名稱為 suspicious_keywords）
     }
 
 # analyze_text(text)對應app.py第117行
 # 這個函式是「對外的簡化版本」：輸入一句文字 → 回傳詐騙判定結果
 # 用在主程式或 FastAPI 後端中，是整個模型預測流程的入口點
 
-def analyze_text(text):
-    # 呼叫前面定義好的 predict_single_sentence()
-    # 傳入模型、tokenizer、輸入文字 → 回傳三項結果
-    model, tokenizer = load_model_and_tokenizer()
-    return predict_single_sentence(model, tokenizer, text)
-    
-    
 
+#------------ CNN ------------
+def extract_suspicious_tokens_cnn(model, tokenizer, text, top_k=3):
+    model.eval()
+    model.to(device)
+
+    # 清理與編碼輸入文字
+    sentence = re.sub(r"\s+", "", text)
+    sentence = re.sub(r"[^\u4e00-\u9fffA-Za-z0-9。，！？]", "", sentence)
+
+    encoded = tokenizer(sentence,
+                        return_tensors="pt",
+                        truncation=True,
+                        padding="max_length",
+                        max_length=128)
+
+    input_ids = encoded["input_ids"].to(device)
+    attention_mask = encoded["attention_mask"].to(device)
+    token_type_ids = encoded["token_type_ids"].to(device)
+
+    # 前向傳遞直到 CNN 輸出
+    with torch.no_grad():
+        hidden_states = model.bert(input_ids=input_ids,
+                                   attention_mask=attention_mask,
+                                   token_type_ids=token_type_ids).last_hidden_state
+        lstm_out, _ = model.LSTM(hidden_states)
+        conv_input = lstm_out.transpose(1, 2)
+        conv_out = model.conv1(conv_input)  # conv_out = [batch, 128, seq_len]
+
+    # 這裡會將conv_out的輸出[batch, 128, seq_len]，壓縮成[seq_len]，也就是轉換成bert編碼形勢的句子。
+    token_scores = conv_out.mean(dim=1).squeeze()
+
+    # torch.topk(token_scores, top_k)會得到分數高的token，和對應索引位置，.indices只留下索引，.cpu()把結果從GPU移到CPU（必要才能轉為 list），
+    # .tolist()轉化成list格式。挑出重要性最高的幾個 token 的位置索引。
+    topk_indices = torch.topk(token_scores, top_k).indices.cpu().tolist()
+
+    """ 
+    tokenizer.convert_ids_to_tokens(input_ids.squeeze())將bert編碼還原成原始文字
+    這段input_ids = encoded["input_ids"].to(device)輸出的編碼，還原成文字
+    .squeeze() 去掉 batch 維度，得到 [seq_len]。
+    [tokens[i] for i in topk_indices if tokens[i] not in ["[PAD]", "[CLS]", "[SEP]"]]
+    上面的程式碼為，i為topk_indices挑出的索引，token[i]為分數最高的文字，也就是可疑的詞句。
+    not in 就能避免選到就能避免選到[CLS]、[SEP]、 [PAD]
+    [CLS] 開始符號 = 101
+    [SEP] 結束符號 = 102
+    [PAD] 補空白 = 0
+    """
+    tokens = tokenizer.convert_ids_to_tokens(input_ids.squeeze())
+    suspicious_tokens = [tokens[i] for i in topk_indices if tokens[i] not in ["[PAD]", "[CLS]", "[SEP]"]]
+
+    return suspicious_tokens
+
+
+#------------ Bert Attention ------------
+def extract_suspicious_tokens_attention(model, tokenizer, text, top_k=3):
+    from transformers import BertModel  # 避免重複 import
+
+    sentence = re.sub(r"\s+", "", text)
+    sentence = re.sub(r"[^\u4e00-\u9fffA-Za-z0-9。，！？]", "", sentence)
+
+    encoded = tokenizer(sentence,
+                        return_tensors="pt",
+                        truncation=True,
+                        padding="max_length",
+                        max_length=128)
+
+    input_ids = encoded["input_ids"].to(device)
+    attention_mask = encoded["attention_mask"].to(device)
+    token_type_ids = encoded["token_type_ids"].to(device)
+
+    with torch.no_grad():
+        bert_outputs = model.bert(input_ids=input_ids,
+                                  attention_mask=attention_mask,
+                                  token_type_ids=token_type_ids,
+                                  output_attentions=True)
+        # 取第一層第0個 head 的 attention（CLS → all tokens）
+        attention_scores = bert_outputs.attentions[0][0, 0, 0, :]  # [seq_len]
+    
+    topk_indices = torch.topk(attention_scores, top_k).indices.cpu().tolist()
+    
+    tokens = tokenizer.convert_ids_to_tokens(input_ids.squeeze())
+    suspicious_tokens = [tokens[i] for i in topk_indices if tokens[i] not in ["[PAD]", "[CLS]", "[SEP]"]]
+
+    return suspicious_tokens
+
+
+
+def analyze_text(text, explain_mode="cnn"):
+    model, tokenizer = load_model_and_tokenizer()
+    model.eval()
+
+    # 預測標籤與信心分數
+    label, prob, risk = predict_single_sentence(model, tokenizer, text)
+
+    # 根據模式擷取可疑詞
+    if explain_mode == "cnn":
+        suspicious = extract_suspicious_tokens_cnn(model, tokenizer, text)
+    elif explain_mode == "bert":
+        suspicious = extract_suspicious_tokens_attention(model, tokenizer, text)
+    elif explain_mode == "both":
+        cnn_tokens = extract_suspicious_tokens_cnn(model, tokenizer, text)
+        bert_tokens = extract_suspicious_tokens_attention(model, tokenizer, text)
+        suspicious = list(set(cnn_tokens + bert_tokens))
+    else:
+        suspicious = [risk]  # fallback 傳回風險詞組
+
+    return {
+        "status": label,
+        "confidence": round(prob * 100, 2),
+        "suspicious_keywords": suspicious
+    }

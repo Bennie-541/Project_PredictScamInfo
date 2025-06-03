@@ -4,7 +4,9 @@
 如果以anaconda開啟vscode請先確認有安狀下列套件
 ctrl+shift+x找Live Server並安裝。Live Server是很好用的html前端工具。安裝後,html文件內,右鍵往下找Open with Live server
 在anaconda啟動頁面找anaconda_powershell_prompt下在下列套件,複製貼上就好
-pip install transformers
+
+pip install fastapi uvicorn pydantic python-multipart aiofiles transformers huggingface_hub torch
+pip install transformers huggingface_hub requests torch torchvision
 pip install torch         
 pip install scikit-learn
 pip install transformers torch
@@ -12,6 +14,7 @@ pip install --upgrade torch --extra-index-url https://download.pytorch.org/whl/c
 pip install --upgrade torch --index-url https://download.pytorch.org/whl/cpu
 pip install tqdm
 pip install easyocr
+
 
 ---測試本地前後端連接---
 ->打開terminal再來按+號
