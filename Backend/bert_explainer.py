@@ -23,10 +23,13 @@ tokenizer = None
 # ✅ 延遲載入模型與 tokenizer
 def load_model_and_tokenizer():
     global model, tokenizer
-    model_path = hf_hub_download(repo_id="Bennie12/Bert-Lstm-Cnn-ScamDetecter", filename="model.pth")
+    if os.path.exists("model.pth"):
+        model_path = "model.pth"
+    else:
+        model_path = hf_hub_download(repo_id="Bennie12/Bert-Lstm-Cnn-ScamDetecter", filename="model.pth")
     # 匯入模型架構（避免在模組初始化階段就占用大量記憶體）
     from AI_Model_architecture import BertLSTM_CNN_Classifier
-        """
+    """
       file_id = "19t6NlRFMc1i8bGtngRwIRtRcCmibdP9q"
     
     url = f"https://drive.google.com/uc?export=download&id={file_id}"  
@@ -112,9 +115,9 @@ def predict_single_sentence(model, tokenizer, sentence, max_len=256):
         # ----------- 回傳結果給呼叫端（通常是 API） -----------
         # 組成一個 Python 字典（對應 API 的 JSON 輸出格式）
         return {
-        pre_label,                  # 預測分類（"詐騙" or "正常"）
-        prob, # 預測分類（"詐騙" or "正常"）  
-        risk     # 用風險分級當作"可疑提示"放進 list（名稱為 suspicious_keywords）
+        "label" : pre_label,                  # 預測分類（"詐騙" or "正常"）
+        "prob" : prob, # 預測分類（"詐騙" or "正常"）  
+        "risk" : risk     # 用風險分級當作"可疑提示"放進 list（名稱為 suspicious_keywords）
     }
 
 # analyze_text(text)對應app.py第117行
@@ -197,6 +200,10 @@ def extract_suspicious_tokens_attention(model, tokenizer, text, top_k=3):
                                   token_type_ids=token_type_ids,
                                   output_attentions=True)
         # 取第一層第0個 head 的 attention（CLS → all tokens）
+        """
+        attentions[0]第 0 層 attention（BERT 第 1 層），[0, 0, 0, :]取出第 0 個 batch、第 0 個 head、第 0 個 token（CLS）對所有 token 的注意力分數
+        
+        """
         attention_scores = bert_outputs.attentions[0][0, 0, 0, :]  # [seq_len]
     
     topk_indices = torch.topk(attention_scores, top_k).indices.cpu().tolist()
@@ -213,8 +220,10 @@ def analyze_text(text, explain_mode="cnn"):
     model.eval()
 
     # 預測標籤與信心分數
-    label, prob, risk = predict_single_sentence(model, tokenizer, text)
-
+    result = predict_single_sentence(model, tokenizer, text)
+    label = result["label"]
+    prob = result["prob"]
+    risk = result["risk"]
     # 根據模式擷取可疑詞
     if explain_mode == "cnn":
         suspicious = extract_suspicious_tokens_cnn(model, tokenizer, text)

@@ -43,7 +43,7 @@ base_dir = os.getenv("DATA_DIR", "./data")  # 如果沒設環境變數就預設�
 #程式碼一至131行
 
 # GPU 記憶體限制(可選)
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:16"
+# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:16"
 
 #資料前處理
 class BertPreprocessor:

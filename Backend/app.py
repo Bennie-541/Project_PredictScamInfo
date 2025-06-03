@@ -24,7 +24,7 @@ pip install easyocr
 ->輸入 "cd Backend" (進入後端資料夾)
 ->(/d/Project_PredictScamInfo/Backend)位址有Backend就是OK
 ->輸入" uvicorn app:app --reload "
-->(INFO:     Will watch for changes in these directories: ['D:\\Project_PredictScamInfo\\Backend']
+->(INFO:     Will watch for changes in these directories: ['D:\\Project_PredictScamInfo\\Backend']  
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.)

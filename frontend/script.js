@@ -11,10 +11,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const confidenceScoreSpan = document.getElementById('confidence_score');    // 顯示模型預測可信度
     const suspiciousPhrasesDiv = document.getElementById('suspicious_phrases'); // 顯示可疑詞句列表
 
-    // 後端 FastAPI API 的 URL
-    // 在開發階段，通常是 http://127.0.0.1:8000 或 http://localhost:8000
-    // 請根據你實際運行 FastAPI 的位址和 Port 進行設定
-    const API_URL = "127.0.0.1:8000/predict"; 
+    /*
+    後端 FastAPI API 的 URL
+    在開發階段，通常是 http://127.0.0.1:8000 或 http://localhost:8000
+    請根據你實際運行 FastAPI 的位址和 Port 進行設定
+     */
+    const API_URL = window.location.hostname.includes("127.0.0.1") || window.location.hostname.includes("localhost")
+  ? "http://127.0.0.1:8000/predict"
+  : "https://your-production-api-url/predict";
+
 
     // --- 檢測按鈕點擊事件監聽器 ---
     // 當檢測按鈕被點擊時，執行非同步函數
