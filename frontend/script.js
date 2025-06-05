@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const API_URL = "https://Bennie12-Project-PredictScamInfo.hf.space/run/predict_text"
 
-    const API_IMAGE_URL = "https://Bennie12-Project-PredictScamInfo.hf.space/run/predict/predict_image"
+    const API_IMAGE_URL = "https://Bennie12-Project-PredictScamInfo.hf.space/run/predict_image"
 
     // --- 檢測按鈕點擊事件監聽器 ---
     // 當檢測按鈕被點擊時，執行非同步函數
