@@ -22,9 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
     http://127.0.0.1:8000/predict
     http://127.0.0.1:8000/predict-image
      */
-    const API_URL = "https://project-predictscaminfo.onrender.com/predict"
+    const API_URL = "https://Bennie12-Project-PredictScamInfo.hf.space/run/predict"
 
-    const API_IMAGE_URL = "https://project-predictscaminfo.onrender.com/predict-image"
+    const API_IMAGE_URL = "https://Bennie12-Project-PredictScamInfo.hf.space/run/predict/predict-image"
 
     // --- 檢測按鈕點擊事件監聽器 ---
     // 當檢測按鈕被點擊時，執行非同步函數
