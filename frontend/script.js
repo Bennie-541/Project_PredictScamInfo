@@ -22,9 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
     http://127.0.0.1:8000/predict
     http://127.0.0.1:8000/predict-image
      */
-    const API_URL = "https://Bennie12-Project-PredictScamInfo.hf.space/run/predict"
+    const API_URL = "https://Bennie12-Project-PredictScamInfo.hf.space/run/predict_text"
 
-    const API_IMAGE_URL = "https://Bennie12-Project-PredictScamInfo.hf.space/run/predict/predict-image"
+    const API_IMAGE_URL = "https://Bennie12-Project-PredictScamInfo.hf.space/run/predict/predict_image"
 
     // --- 檢測按鈕點擊事件監聽器 ---
     // 當檢測按鈕被點擊時，執行非同步函數
@@ -48,13 +48,13 @@ document.addEventListener('DOMContentLoaded', () => {
         suspiciousPhrasesDiv.innerHTML = '<p>正在分析訊息，請稍候...</p>';//<></>大部分html語法長這樣
 
         try {
-//fetch(API_URL, {...})。API_URL第17段的變數。method:為html方法，POST送出請求。headers告訴伺服器傳送的資料格式是什麼。
-//這段是用 fetch 來呼叫後端 API，送出 POST 請求：
-            
+/*fetch(API_URL, {...})。API_URL第17段的變數。method:為html方法，POST送出請求。headers告訴伺服器傳送的資料格式是什麼。
+這段是用 fetch 來呼叫後端 API，送出 POST 請求：
+renden的heders:{'Content-Type': 'application/json'}告訴伺服器發送的資料是 JSON 格式。選JSON原因: 我們使用前端(JavaScript)與後端(Python FastAPI)是兩種不同的語言，而JSON是前後端通訊的「共通語言」，交換最通用、最方便、最安全的格式。
+*/
             const response = await fetch(API_URL, {     
                 method: 'POST', // 指定 HTTP 方法為 POST
-                headers: {      // 告訴伺服器發送的資料是 JSON 格式。選JSON原因:
-//我們使用前端(JavaScript)與後端(Python FastAPI)是兩種不同的語言，而JSON是前後端通訊的「共通語言」，交換最通用、最方便、最安全的格式。
+                headers: {                        
                     'Content-Type': 'application/json'
                 },
                 //把JavaScript物件{text:message}轉換成JSON格式字串，字串作為請求的主體 (body)
