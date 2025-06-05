@@ -1,6 +1,6 @@
 # 忽略資料資料夾
 data/
-
+Backend/
 # 忽略 firebase 測試與機密
 test_firebase.py
 firebase-credentials.json
@@ -12,3 +12,5 @@ __pycache__/
 # 本地 env 設定
 readfile.env
 .env
+
+bfg-1.14.0.jar
