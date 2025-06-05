@@ -5,21 +5,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputTextArea = document.getElementById('predict_info'); // 輸入訊息的文字區域
     const inputButton = document.getElementById('detect_button');  // 檢測按鈕
     const clearButton = document.getElementById('clear_button');   // 清除按鈕
+// 取得圖片上傳欄位與圖片按鈕
+    const imageInput = document.getElementById('imageInput');
+    const imageButton = document.getElementById('image_button');
 
     // 取得顯示結果的 HTML 元素
     const normalOrScam = document.getElementById('is_scam');                    // 顯示正常或詐騙
     const confidenceScoreSpan = document.getElementById('confidence_score');    // 顯示模型預測可信度
     const suspiciousPhrasesDiv = document.getElementById('suspicious_phrases'); // 顯示可疑詞句列表
 
+    const mode = document.getElementById('modeSelect').value;
     /*
     後端 FastAPI API 的 URL
     在開發階段，通常是 http://127.0.0.1:8000 或 http://localhost:8000
     請根據你實際運行 FastAPI 的位址和 Port 進行設定
+    http://127.0.0.1:8000/predict
+    http://127.0.0.1:8000/predict-image
      */
-    const API_URL = window.location.hostname.includes("127.0.0.1") || window.location.hostname.includes("localhost")
-  ? "http://127.0.0.1:8000/predict"
-  : "https://your-production-api-url/predict";
+    const API_URL = "https://project-predictscaminfo.onrender.com/predict"
 
+    const API_IMAGE_URL = "https://project-predictscaminfo.onrender.com/predict-image"
 
     // --- 檢測按鈕點擊事件監聽器 ---
     // 當檢測按鈕被點擊時，執行非同步函數
@@ -42,10 +47,10 @@ document.addEventListener('DOMContentLoaded', () => {
         confidenceScoreSpan.textContent = '計算中...';//.innerHTML->插入 HTML 語法
         suspiciousPhrasesDiv.innerHTML = '<p>正在分析訊息，請稍候...</p>';//<></>大部分html語法長這樣
 
-        try {//try...catch處理程式錯誤。
+        try {
 //fetch(API_URL, {...})。API_URL第17段的變數。method:為html方法，POST送出請求。headers告訴伺服器傳送的資料格式是什麼。
 //這段是用 fetch 來呼叫後端 API，送出 POST 請求：
-            const mode = document.getElementById('modeSelect').value;
+            
             const response = await fetch(API_URL, {     
                 method: 'POST', // 指定 HTTP 方法為 POST
                 headers: {      // 告訴伺服器發送的資料是 JSON 格式。選JSON原因:
@@ -76,7 +81,41 @@ document.addEventListener('DOMContentLoaded', () => {
             resetResults();                      // 將介面恢復到初始狀態
         }
     });
+    imageButton.addEventListener('click', async()=>{
+        const file = imageInput.files[0]; //取得上傳相片
+        if (!file){
+            alert("請先選擇圖片");
+            return;
+        }
+        // 顯示載入中提示
+        normalOrScam.textContent = '圖片分析中...';
+        normalOrScam.style.color = 'gray';
+        confidenceScoreSpan.textContent = '計算中...';
+        suspiciousPhrasesDiv.innerHTML = '<p>正在從圖片擷取文字與分析中...</p>';
 
+        try{
+            const formData = new FormData();
+            formData.append("explain_mode", mode);
+            formData.append("file", file); // 附加圖片檔案給後端
+            const response = await fetch(API_IMAGE_URL,{
+                    method : "POST",
+                    body : formData
+            });
+            if (!response.ok){
+                throw new Error(`圖片分析失敗: ${response.status} ${response.statusText}`);
+            }
+            const data = await response.json();
+            updateResults(
+                data.status,
+                data.confidence,
+                data.suspicious_keywords
+            )
+        }catch(error) {
+            console.error("圖片上傳失敗",error);
+            alert("圖片分析失敗")
+            resetResults();
+        }
+    });
     // --- 清除按鈕點擊事件監聽器 ---
     // 當清除按鈕被點擊時，執行函數
     clearButton.addEventListener('click', () => {

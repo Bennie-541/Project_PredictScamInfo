@@ -33,6 +33,7 @@ from transformers import BertTokenizer # BertTokenizer把文字句子轉換成 B
 from sklearn.model_selection import train_test_split
 from transformers import BertModel
 
+"""
 # ------------------- 載入 .env 環境變數 -------------------
 load_dotenv()
 base_dir = os.getenv("DATA_DIR", "./data")  # 如果沒設環境變數就預設用 ./data
@@ -136,6 +137,8 @@ if __name__ == "__main__":
     # 每次從 Dataset 中抓一批(batch)資料出來
     train_loader = DataLoader(train_dataset, batch_size=8)
     val_loader = DataLoader(val_dataset, batch_size=8)
+"""
+
 
 """
 class BertLSTM_CNN_Classifier(nn.Module)表示:你定義了一個子類別,
@@ -224,7 +227,9 @@ logits = [[0.92], [0.05], [0.88], [0.41], ..., [0.17]]
 → squeeze → [0.715, 0.512, ...]
 """
         return torch.sigmoid(logits).squeeze() # 最後輸出是一個值介於 0 ~ 1 之間,代表「為詐騙訊息的機率」。
-        
+
+
+"""
 # 設定 GPU 裝置
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -234,15 +239,8 @@ model = BertLSTM_CNN_Classifier().to(device)
 optimizer = torch.optim.Adam(model.parameters(),lr=2e-5)
 criterion = nn.BCELoss()
 
-#只保留推論即可,模型訓練應該在本地完成！
-if os.path.exists("model.pth"):
-    print("✅ 已找到 model.pth,載入模型跳過訓練")
-    model.load_state_dict(torch.load("model.pth", map_location=device))
-else:
-    print("❌ 未找到 model.pth")
-
 # 本機訓練迴圈,要訓練再取消註解,否則在線上版本一律處於註解狀態
-"""
+
 if __name__ == "__main__": # 只有當我「直接執行這個檔案」時,才執行以下訓練程式(不是被別人 import 使用時)。
     if os.path.exists("model.pth"):
         print("✅ 已找到 model.pth,載入模型跳過訓練")

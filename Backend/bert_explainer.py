@@ -6,14 +6,22 @@
 # re是Python內建的正則表示式(regular expression)模組，在這專案中用來"用關鍵規則篩選文字內容"。
 # requests是一個非常好用的 HTTP 請求套件，能讓你從Python發送GET/POST請求，在專案中用來從Google Drive下載模型檔案(model.pth)。
 # BertTokenizer:從Hugging Face的transformers套件載入一個專用的「分詞器（Tokenizer）」。
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+
 import torch                
 import re
-import os
-import requests
+import easyocr
+import io
+import numpy as np
 
-
+from PIL import Image
 from huggingface_hub import hf_hub_download
 from transformers import BertTokenizer
+
+
+
 
 # 設定裝置（GPU 優先）
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -28,7 +36,7 @@ def load_model_and_tokenizer():
     else:
         model_path = hf_hub_download(repo_id="Bennie12/Bert-Lstm-Cnn-ScamDetecter", filename="model.pth")
     # 匯入模型架構（避免在模組初始化階段就占用大量記憶體）
-    from AI_Model_architecture import BertLSTM_CNN_Classifier
+    from Backend.AI_Model_architecture import BertLSTM_CNN_Classifier
     """
       file_id = "19t6NlRFMc1i8bGtngRwIRtRcCmibdP9q"
     
@@ -233,11 +241,25 @@ def analyze_text(text, explain_mode="cnn"):
         cnn_tokens = extract_suspicious_tokens_cnn(model, tokenizer, text)
         bert_tokens = extract_suspicious_tokens_attention(model, tokenizer, text)
         suspicious = list(set(cnn_tokens + bert_tokens))
-    else:
-        suspicious = [risk]  # fallback 傳回風險詞組
 
     return {
         "status": label,
         "confidence": round(prob * 100, 2),
         "suspicious_keywords": suspicious
     }
+
+def analyze_image(file_bytes, explain_mode = "cnn"):
+    image = Image.open(io.BytesIO(file_bytes))
+    image_np = np.array(image)
+    reader = easyocr.Reader(['ch_tra', 'en'], gpu=torch.cuda.is_available())
+    results = reader.readtext(image_np)
+    
+    text = ' '.join([res[1] for res in results]).strip()
+    
+    if not text:
+        return{
+            "status" : "無法辨識文字",
+            "confidence" : 0.0,
+            "suspicious_keywords" : ["圖片中無可辨識的中文英文"]
+        }
+    return analyze_text(text, explain_mode=explain_mode)

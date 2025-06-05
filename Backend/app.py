@@ -14,6 +14,7 @@ pip install --upgrade torch --extra-index-url https://download.pytorch.org/whl/c
 pip install --upgrade torch --index-url https://download.pytorch.org/whl/cpu
 pip install tqdm
 pip install easyocr
+pip install python-multipart
 
 
 ---測試本地前後端連接---
@@ -35,12 +36,13 @@ INFO:     Uvicorn running on http://127.0.0.1:8000
 INFO:     Started reloader process...
 """
 
-from fastapi import FastAPI, HTTPException                   # 匯入 FastAPI 主功能模組與 HTTP 錯誤處理
-from fastapi.middleware.cors import CORSMiddleware           # 匯入 CORS 模組：用來允許前端跨來源存取 API
-from pydantic import BaseModel                               # 用於定義 API 的資料結構模型
-from datetime import datetime                                # 處理時間格式(如分析時間戳)
-from typing import Optional, List                            # 型別註解：可選、列表
-from bert_explainer import analyze_text  # 匯入自定義的 BERT 模型分析函式
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form # 匯入 FastAPI 主功能模組與 HTTP 錯誤處理
+from fastapi.middleware.cors import CORSMiddleware # 匯入 CORS 模組：用來允許前端跨來源存取 API
+from pydantic import BaseModel # 用於定義 API 的資料結構模型
+from datetime import datetime # 處理時間格式(如分析時間戳)
+from typing import Optional, List # 型別註解：可選、列表
+from Backend.bert_explainer import analyze_text, analyze_image # 匯入自定義的 BERT 模型分析函式
+
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -129,6 +131,22 @@ async def analyze_text_api(request: TextAnalysisRequest):
         except Exception as e:
             print("❌ 錯誤訊息：", str(e))
             raise HTTPException(status_code=500, detail="內部伺服器錯誤")
+    
+@app.post("/predict-image", response_model=TextAnalysisResponse)
+async def predict_image_api(file: UploadFile = File(...), explain_mode : str = Form("cnn")):
+    try:
+        print("📷 收到圖片上傳：", file.filename, "| 模式:", explain_mode)
+        contents = await file.read()        
+        result = analyze_image(contents, explain_mode=explain_mode)
+        return TextAnalysisResponse(
+            status=result["status"],
+            confidence=result["confidence"],
+            suspicious_keywords=result["suspicious_keywords"],
+            analysis_timestamp=datetime.now()
+        )
+    except Exception as e:
+        print("❌ 圖片處理錯誤：", str(e))
+        raise HTTPException(status_code=500, detail="圖片辨識或預測失敗")
 """
 使用模型分析該文字(實際邏輯在 bert_explainer.py)
          呼叫模型進行詐騙分析,這會呼叫模型邏輯(在bert_explainer.py),把輸入文字送去分析,得到像這樣的回傳結果(假設)：
