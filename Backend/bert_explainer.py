@@ -245,7 +245,7 @@ def analyze_text(text, explain_mode="cnn"):
     return {
         "status": label,
         "confidence": round(prob * 100, 2),
-        "suspicious_keywords": suspicious
+        "suspicious_keywords": [str(s) for s in suspicious]
     }
 
 def analyze_image(file_bytes, explain_mode = "cnn"):

@@ -130,7 +130,7 @@ async def analyze_text_api(request: TextAnalysisRequest):
         )
         except Exception as e:
             print("❌ 錯誤訊息：", str(e))
-            raise HTTPException(status_code=500, detail="內部伺服器錯誤")
+            raise HTTPException(status_code=500, detail=f"內部伺服器錯誤：{str(e)}")
     
 @app.post("/predict-image", response_model=TextAnalysisResponse)
 async def predict_image_api(file: UploadFile = File(...), explain_mode : str = Form("cnn")):
@@ -160,4 +160,6 @@ async def predict_image_api(file: UploadFile = File(...), explain_mode : str = F
         # status、confidence、suspicious_keywords在script.js、app.py和bert_explainer是對應的變數,未來有需大更動,必須注意一致性。
 """
         
-    
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
