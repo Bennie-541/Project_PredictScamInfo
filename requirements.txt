@@ -15,5 +15,6 @@ aiofiles
 easyocr
 Pillow
 numpy
+gradio
 
 huggingface_hub

@@ -36,7 +36,7 @@ def load_model_and_tokenizer():
     else:
         model_path = hf_hub_download(repo_id="Bennie12/Bert-Lstm-Cnn-ScamDetecter", filename="model.pth")
     # 匯入模型架構（避免在模組初始化階段就占用大量記憶體）
-    from Backend.AI_Model_architecture import BertLSTM_CNN_Classifier
+    from AI_Model_architecture import BertLSTM_CNN_Classifier
     """
       file_id = "19t6NlRFMc1i8bGtngRwIRtRcCmibdP9q"
     
@@ -241,6 +241,8 @@ def analyze_text(text, explain_mode="cnn"):
         cnn_tokens = extract_suspicious_tokens_cnn(model, tokenizer, text)
         bert_tokens = extract_suspicious_tokens_attention(model, tokenizer, text)
         suspicious = list(set(cnn_tokens + bert_tokens))
+    else:
+        suspicious = [risk]
 
     return {
         "status": label,
