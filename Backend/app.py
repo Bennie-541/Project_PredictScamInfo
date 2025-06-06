@@ -67,33 +67,23 @@ async def analyze_text_api(request: TextAnalysisRequest):
         raise HTTPException(status_code=500, detail=f"後端錯誤：{str(e)}")
 
 # === 轉送圖片預測請求到 Hugging Face Space ===
-@app.post("/predict-image", response_model=TextAnalysisResponse)
-async def predict_image_api(file: UploadFile = File(...), explain_mode: str = Form("cnn")):
-    try:
-        # 將圖片暫存為檔案路徑（HF Space 需要實體路徑）
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
-            temp_file.write(await file.read())
-            temp_file_path = temp_file.name
+@app.post("/predict-image")
+async def predict_image(image: UploadFile = File(...), explain_mode: str = "cnn"):
+    image_bytes = await image.read()
+    files = {
+        "file": ("image.png", image_bytes, image.content_type),
+    }
+    data = {
+        "explain_mode": explain_mode
+    }
+    # 正確轉發 multipart/form-data
+    response = requests.post(
+        "https://bennie12-project-predictscaminfo.hf.space/run/predict_image",
+        files=files,
+        data=data
+    )
+    return response.json()
 
-        with open(temp_file_path, "rb") as f:
-            files = {"file_path": (os.path.basename(temp_file_path), f, "image/png")}
-            data = {"data": [temp_file_path, explain_mode]}
-            hf_response = requests.post(HF_IMAGE_API, data=data, files=files)
-
-        os.remove(temp_file_path)
-
-        if hf_response.status_code != 200:
-            raise Exception(f"Hugging Face API 錯誤：{hf_response.status_code}")
-
-        result = hf_response.json()
-        return TextAnalysisResponse(
-            status=result["data"][0],
-            confidence=float(result["data"][1].replace("%", "")),
-            suspicious_keywords=result["data"][2].split(", "),
-            analysis_timestamp=datetime.now()
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"圖片處理錯誤：{str(e)}")
     
 @app.post("/predict", response_model=TextAnalysisResponse)
 async def analyze_text_api(request: TextAnalysisRequest):
