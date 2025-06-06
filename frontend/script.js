@@ -22,8 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
     http://127.0.0.1:8000/predict
     http://127.0.0.1:8000/predict-image
      */
-    const API_URL = "https://bennie12-project-predictscaminfo.hf.space/run/predict_text";
-    const API_IMAGE_URL = "https://bennie12-project-predictscaminfo.hf.space/run/predict_image";
+    const API_URL = "https://Bennie12-Project-PredictScamInfo.hf.space/run/predict_text";
+    const API_IMAGE_URL = "https://Bennie12-Project-PredictScamInfo.hf.space/run/predict_image";
 
 
     // --- 檢測按鈕點擊事件監聽器 ---
