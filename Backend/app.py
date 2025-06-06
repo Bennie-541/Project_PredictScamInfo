@@ -68,10 +68,10 @@ async def analyze_text_api(request: TextAnalysisRequest):
 
 # === 轉送圖片預測請求到 Hugging Face Space ===
 @app.post("/predict-image")
-async def predict_image(image: UploadFile = File(...), explain_mode: str = "cnn"):
-    image_bytes = await image.read()
+async def predict_image(file: UploadFile = File(...), explain_mode: str = "cnn"):
+    image_bytes = await file.read()
     files = {
-        "file": ("image.png", image_bytes, image.content_type),
+        "file": ("image.png", image_bytes, file.content_type),
     }
     data = {
         "explain_mode": explain_mode
