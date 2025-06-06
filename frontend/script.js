@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const confidenceScoreSpan = document.getElementById('confidence_score');    // 顯示模型預測可信度
     const suspiciousPhrasesDiv = document.getElementById('suspicious_phrases'); // 顯示可疑詞句列表
 
-    const mode = document.getElementById('modeSelect').value;
+
     /*
     後端 FastAPI API 的 URL
     在開發階段，通常是 http://127.0.0.1:8000 或 http://localhost:8000
@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // async 是「非同步函數」的關鍵字，允許你在函數中使用 await。它讓你可以像同步一樣撰寫非同步程式(例如網路請求)。
 
     inputButton.addEventListener('click', async () => {  
+        const mode = document.getElementById('modeSelect').value;
         const message = inputTextArea.value.trim(); //.value取得<textarea>的輸入內容。
                                         //.trim()刪掉文字開頭和結尾的空白，避免誤判空訊息。
         // 檢查輸入框是否為空
@@ -82,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     imageButton.addEventListener('click', async()=>{
+        const mode = document.getElementById('modeSelect').value;
         const file = imageInput.files[0]; //取得上傳相片
         if (!file){
             alert("請先選擇圖片");
