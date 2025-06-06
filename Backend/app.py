@@ -94,6 +94,34 @@ async def predict_image_api(file: UploadFile = File(...), explain_mode: str = Fo
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"圖片處理錯誤：{str(e)}")
+    
+@app.post("/predict", response_model=TextAnalysisResponse)
+async def analyze_text_api(request: TextAnalysisRequest):
+    try:
+        payload = {
+            "data": [request.text, request.explain_mode]
+        }
+        print("🔄 傳送資料到 Hugging Face：", payload)
+
+        hf_response = requests.post(HF_TEXT_API, json=payload)
+
+        print("✅ HF 回應狀態碼：", hf_response.status_code)
+        print("✅ HF 回應內容：", hf_response.text)
+
+        if hf_response.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"Hugging Face 回應錯誤：{hf_response.text}")
+
+        result = hf_response.json()
+
+        return TextAnalysisResponse(
+            status=result["data"][0],
+            confidence=float(result["data"][1].replace("%", "")),
+            suspicious_keywords=result["data"][2].split(", "),
+            analysis_timestamp=datetime.now()
+        )
+    except Exception as e:
+        print("❌ 中繼點錯誤：", str(e))
+        raise HTTPException(status_code=500, detail=f"Render app.py 發生錯誤：{str(e)}")    
 
 # === 健康檢查 ===
 @app.get("/health")
