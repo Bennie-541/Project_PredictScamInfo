@@ -58,7 +58,7 @@ renden的heders:{'Content-Type': 'application/json'}告訴伺服器發送的資�
                     'Content-Type': 'application/json'
                 },
                 //把JavaScript物件{text:message}轉換成JSON格式字串，字串作為請求的主體 (body)
-                body: JSON.stringify({ text: message , explain_mode : mode}), 
+                body: JSON.stringify({ data: [message, mode] }), 
             });
 
             // 檢查 HTTP 回應是否成功 (例如：狀態碼 200 OK)
