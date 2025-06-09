@@ -6,6 +6,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputButton = document.getElementById('detect_button');  // 檢測按鈕
     const clearButton = document.getElementById('clear_button');   // 清除按鈕
 
+    // 取得圖片上傳欄位與圖片按鈕
+    const imageInput = document.getElementById('imageInput');
+    const imageButton = document.getElementById('image_button');
+    
     // 取得顯示結果的 HTML 元素
     const normalOrScam = document.getElementById('is_scam');                    // 顯示正常或詐騙
     const confidenceScoreSpan = document.getElementById('confidence_score');    // 顯示模型預測可信度
@@ -17,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     請根據你實際運行 FastAPI 的位址和 Port 進行設定
      */
     const API_URL = "http://127.0.0.1:8000/predict";
-
+    const API_IMAGE_URL = "http://127.0.0.1:8000/predict-image"
 
     // --- 檢測按鈕點擊事件監聽器 ---
     // 當檢測按鈕被點擊時，執行非同步函數
@@ -108,6 +112,16 @@ document.addEventListener('DOMContentLoaded', () => {
             resetResults();
         }
     });
+
+    function highlightSuspiciousWords(text, suspiciousParts) {
+    let highlighted = text;
+    suspiciousParts.forEach(word => {
+        const pattern = new RegExp(word, 'g');
+        highlighted = highlighted.replace(pattern, `<span class="highlight">${word}</span>`);
+    });
+    return highlighted;
+}
+
     // --- 清除按鈕點擊事件監聽器 ---
     // 當清除按鈕被點擊時，執行函數
     clearButton.addEventListener('click', () => {
@@ -139,16 +153,10 @@ document.addEventListener('DOMContentLoaded', () => {
         suspiciousPhrasesDiv.innerHTML = ''; // 清空之前顯示的可疑詞句
         //05/23目前未做出抓出關鍵字功能，預設為顯示輸入句子
         // 如果有可疑詞句，則以列表形式顯示
-        if (suspiciousParts && suspiciousParts.length > 0) { 
-            const ul = document.createElement('ul');        // 建立一個無序列表元素
-            suspiciousParts.forEach(phrase => {             // 遍歷每個可疑詞句
-                const li = document.createElement('li');    // 建立列表項目元素
-                li.textContent = phrase;                    // 設定列表項目文字
-                ul.appendChild(li);                         // 將列表項目加入無序列表
-            });
-            suspiciousPhrasesDiv.appendChild(ul); // 將無序列表加入顯示區塊
+        if (suspiciousParts && suspiciousParts.length > 0) {
+            const highlightedText = highlightSuspiciousWords(inputTextArea.value, suspiciousParts);
+            suspiciousPhrasesDiv.innerHTML = `<p>${highlightedText}</p>`;
         } else {
-            // 如果沒有可疑詞句，則顯示預設文字
             suspiciousPhrasesDiv.innerHTML = '<p>沒有偵測到特別可疑的詞句。</p>';
         }
     }

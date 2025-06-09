@@ -13,6 +13,14 @@ body {
     align-items: center; /* 讓 h1 居中 */
 }
 
+.highlight {
+    background-color: #fc9c9cd5;
+    color: #000000;
+    font-weight: bold;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
 h1 {
     color: #2c3e50;
     text-align: center;

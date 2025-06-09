@@ -130,19 +130,22 @@ async def analyze_text_api(request: TextAnalysisRequest):
             print("❌ 錯誤訊息：", str(e))
             raise HTTPException(status_code=500, detail="內部伺服器錯誤")
 
-@app.post("/predict-image")
-async def predict_image(file: UploadFile = File(...)):
-    image_bytes = await file.read()
-    files = {
-        "file": ("image.png", image_bytes, file.content_type),
-    }
-    # 正確轉發 multipart/form-data
-    response = requests.post(
-        "https://bennie12-project-predictscaminfo.hf.space/run/predict_image",
-        files=files
-    )
-    return response.json()
 
+@app.post("/predict-image", response_model=TextAnalysisResponse)
+async def predict_image_api(file: UploadFile = File(...)):
+    try:
+        print("📷 收到圖片上傳：", file.filename)
+        contents = await file.read()        
+        result = analyze_image(contents)
+        return TextAnalysisResponse(
+            status=result["status"],
+            confidence=result["confidence"],
+            suspicious_keywords=result["suspicious_keywords"],
+            analysis_timestamp=datetime.now()
+        )
+    except Exception as e:
+        print("❌ 圖片處理錯誤：", str(e))
+        raise HTTPException(status_code=500, detail="圖片辨識或預測失敗")
 """
 使用模型分析該文字(實際邏輯在 bert_explainer.py)
          呼叫模型進行詐騙分析,這會呼叫模型邏輯(在bert_explainer.py),把輸入文字送去分析,得到像這樣的回傳結果(假設)：

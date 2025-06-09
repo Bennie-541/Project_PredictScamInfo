@@ -11,7 +11,7 @@
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-import shap
+from lime.lime_text import LimeTextExplainer
 import torch                
 import re
 import easyocr
@@ -39,19 +39,7 @@ def load_model_and_tokenizer():
         model_path = hf_hub_download(repo_id="Bennie12/Bert-Lstm-Cnn-ScamDetecter", filename="model.pth")
     # 匯入模型架構（避免在模組初始化階段就占用大量記憶體）
     from AI_Model_architecture import BertLSTM_CNN_Classifier
-    """
-      file_id = "19t6NlRFMc1i8bGtngRwIRtRcCmibdP9q"
-    
-    url = f"https://drive.google.com/uc?export=download&id={file_id}"  
-    if not os.path.exists(model_path):   # 如果本地還沒有這個檔案 → 才下載（避免重複）
-            print("📥 Downloading model from Google Drive...")
-            r = requests.get(url)             # 用requests發送GET請求到Google Drive
-            with open(model_path, 'wb')as f: # 把下載的檔案內容寫入到 model.pth 本地檔案
-                f.write(r.content)
-                print("✅ Model downloaded.")     
-    else:
-            print("📦 Model already exists.")
-    """
+
     # 載入模型架構與參數，初始化模型架構並載入訓練權重
     model = BertLSTM_CNN_Classifier()
     
@@ -71,7 +59,8 @@ def load_model_and_tokenizer():
     # 初始化 tokenizer(不要從 build_bert_inputs 中取)
     # 載入預訓練好的CKIP中文BERT分詞器
     # 能把中文句子轉成 BERT 模型需要的 input 格式（input_ids, attention_mask, token_type_ids）
-    tokenizer = BertTokenizer.from_pretrained("ckiplab/bert-base-chinese")
+    tokenizer = BertTokenizer.from_pretrained("ckiplab/bert-base-chinese", use_fast=False)  # ✅ 強制使用非 fast tokenizer
+
 
     return model, tokenizer
 
@@ -92,7 +81,7 @@ def predict_single_sentence(model, tokenizer, sentence, max_len=256):
     with torch.no_grad():
          # ----------- 文字前處理：清洗輸入句子 -----------
         sentence = re.sub(r"\s+", "", sentence)  # 移除所有空白字元（空格、換行等）
-        sentence = re.sub(r"[^\u4e00-\u9fffA-Za-z0-9。，！？]", "", sentence)
+        sentence = re.sub(r"[^\u4e00-\u9fffA-Za-z0-9。，！？:/._-]", "", sentence)
         # 保留常見中文字、英數字與標點符號，其他奇怪符號都移除
         # ----------- 使用 BERT Tokenizer 將句子編碼 -----------
         encoded = tokenizer(sentence,
@@ -129,36 +118,36 @@ def predict_single_sentence(model, tokenizer, sentence, max_len=256):
 # 這個函式是「對外的簡化版本」：輸入一句文字 → 回傳詐騙判定結果
 # 用在主程式或 FastAPI 後端中，是整個模型預測流程的入口點
 
-# ----------- SHAP可疑詞句擷取 -----------
+# ----------- LIME可疑詞句擷取 -----------
 def suspicious_tokens(model, tokenizer, text, top_k=3):
+    print("\n🔍 [suspicious_tokens] 函式被呼叫")
+    print(f"📥 傳入文字內容：{text}")
+    print(f"📥 資料型別：{type(text)}")
 
-    sentence = re.sub(r"\s+", "", text)  # 移除所有空白字元（空格、換行等）
-    sentence = re.sub(r"[^\u4e00-\u9fffA-Za-z0-9。，！？]", "", sentence)
+    if not isinstance(text, str) or not text.strip():
+        print("❌ 警告：輸入不是合法文字，直接返回空列表")
+        return []
 
-    encoded = tokenizer(sentence,
-                        return_tensors="pt",      
-                        truncation=True,          
-                        padding="max_length",
-                        max_length=256)        
-    
-    input_ids = encoded["input_ids"].to(device)
-    attention_mask = encoded["attention_mask"].to(device)
-    token_type_ids = encoded["token_type_ids"].to(device)
+    def predict_proba(texts):
 
-    def forward_fn(input_ids):
+        encoding = tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=256)
+        encoding = {k: v.to(device) for k, v in encoding.items()}
         with torch.no_grad():
-            output = model(input_ids = input_ids,
-                           attention_mask = attention_mask,
-                           token_type_ids = token_type_ids)
-        return output.cpu().numpy()
-    explainer = shap.Explainer(forward_fn, masker=shap.maskers.Independeny(input_ids.cpu(), max_samples=256))
-    shap_values = explainer(input_ids)
-    scores = shap_values.values[0]
-    topk_indices = np.argsort(scores)[-top_k:][::-1]
-    
-    tokens =tokenizer.convert_ids_to_tokens(input_ids.squeeze())
-    suspicious_tokens = [tokens[i] for i in topk_indices if tokens[i] not in ["[PAD]","[CLS]","[SEP]"]]
-    return suspicious_tokens
+            outputs = model(encoding["input_ids"], encoding["attention_mask"], encoding["token_type_ids"])
+            probs = torch.stack([1 - outputs, outputs], dim=1)
+
+        return probs.cpu().numpy()
+
+    class_names = ['正常', '詐騙']
+    explainer = LimeTextExplainer(class_names=class_names, split_expression=r'\s+|[。，！？]')
+    explanation = explainer.explain_instance(text, predict_proba, num_features=top_k, labels=[1])
+
+    keyword_scores = explanation.as_list(label=1)
+
+    keywords = [word for word, score in keyword_scores]
+    return keywords
+
+
     
 def analyze_text(text):
     model, tokenizer = load_model_and_tokenizer()
@@ -175,7 +164,7 @@ def analyze_text(text):
     
     # ----------- 顯示推論資訊（後端終端機） -----------
     print(f"\n📩 訊息內容：{text}")
-    print(f"✅ 預測結果：{'詐騙' if label == 1 else '正常'}")
+    print(f"✅ 預測結果：{label}")  
     print(f"📊 信心值：{round(prob*100, 2)}")
     print(f"⚠️ 風險等級：{risk}")
     print(f"SHAP 可疑關鍵字擷取: {[str(s) for s in suspicious]}")
@@ -186,7 +175,7 @@ def analyze_text(text):
         "suspicious_keywords": [str(s) for s in suspicious]
     }
 
-def analyze_image(file_bytes, explain_mode = "cnn"):
+def analyze_image(file_bytes):
     image = Image.open(io.BytesIO(file_bytes))
     image_np = np.array(image)
     reader = easyocr.Reader(['ch_tra', 'en'], gpu=torch.cuda.is_available())

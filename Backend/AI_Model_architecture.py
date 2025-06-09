@@ -46,25 +46,41 @@ base_dir = os.getenv("DATA_DIR", "./data")  # 如果沒設環境變數就預設�
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:16"
 
 #資料前處理
+
 class BertPreprocessor:
     def __init__(self, tokenizer_name="ckiplab/bert-base-chinese", max_len=128):
         self.tokenizer = BertTokenizer.from_pretrained(tokenizer_name)
         self.max_len = max_len
 
     def load_and_clean(self, filepath):
-        #載入 CSV 並清理 message 欄位。
         df = pd.read_csv(filepath)
         df = df.dropna().drop_duplicates().reset_index(drop=True)
-        # 文字清理:移除空白、保留中文英數與標點
+
+        # 清理 message 欄位
         df["message"] = df["message"].astype(str)
         df["message"] = df["message"].apply(lambda text: re.sub(r"\s+", "", text))
         df["message"] = df["message"].apply(lambda text: re.sub(r"[^\u4e00-\u9fffA-Za-z0-9。,！？]", "", text))
-        return df[["message", "label"]]  # 保留必要欄位
 
-    def encode(self, messages):
-        #使用 HuggingFace BERT Tokenizer 將訊息編碼成Bert模型輸入格式。
+        # 清理 keywords 欄位（如果有）
+        if "keywords" in df.columns:
+            df["keywords"] = df["keywords"].fillna("")
+            df["keywords"] = df["keywords"].apply(
+                lambda x: ast.literal_eval(x) if isinstance(x, str) and x.startswith("[") else []
+            )
+            df["keywords"] = df["keywords"].apply(
+                lambda lst: [re.sub(r"[^\u4e00-\u9fffA-Za-z0-9。,！？]", "", str(k)) for k in lst]
+            )
+            df["keywords"] = df["keywords"].apply(lambda lst: "。".join(lst))
+        else:
+            df["keywords"] = ""
+
+        # 合併為 BERT 輸入內容
+        df["combined"] = df["message"] + "。" + df["keywords"]
+        return df[["combined", "label"]]
+
+    def encode(self, texts):
         return self.tokenizer(
-            list(messages),
+            list(texts),
             return_tensors="pt",
             truncation=True,
             padding="max_length",
@@ -72,35 +88,27 @@ class BertPreprocessor:
         )
 #自動做資料前處理
 def build_bert_inputs(files):
-    #將正常與詐騙資料分別指定 label,統一清理、編碼,回傳模型可用的 input tensors 與 labels。
     processor = BertPreprocessor()
-    dfs = []
-    # 合併正常 + 詐騙檔案清單
-    all_files = files
-
-    for filepath in all_files:
-        df = processor.load_and_clean(filepath)
-        dfs.append(df)
-    
-    # 合併所有資料。在資料清理過程中dropna():刪除有空值的列,drop_duplicates():刪除重複列,filter()或df[...]做條件過濾,concat():將多個 DataFrame合併
-    # 這些操作不會自動重排索引,造成索引亂掉。
-    # 合併後統一編號(常見於多筆資料合併)all_df = pd.concat(dfs, 關鍵-->ignore_index=True)
+    dfs = [processor.load_and_clean(f) for f in files]
     all_df = pd.concat(dfs, ignore_index=True)
+
     print(f"✅ 已讀入 {len(all_df)} 筆資料")
     print(all_df["label"].value_counts())
-    #製作 train/val 資料集
-    train_texts, val_texts, train_labels, val_labels = train_test_split(
-    all_df["message"], all_df["label"],
-    stratify=all_df["label"],
-    test_size=0.2,
-    random_state=25,
-    shuffle=True
-    )
-    # 進行 BERT tokenizer 編碼
-    train_inputs = processor.encode(train_texts)
-    val_inputs = processor.encode(val_texts)
+    print("📌 合併後輸入示例：")
+    print(all_df["combined"].head())
 
-    return train_inputs, train_labels, val_inputs, val_labels, processor
+    train_df, val_df = train_test_split(
+        all_df,
+        stratify=all_df["label"],
+        test_size=0.2,
+        random_state=25,
+        shuffle=True
+    )
+
+    train_inputs = processor.encode(train_df["combined"])
+    val_inputs = processor.encode(val_df["combined"])
+
+    return train_inputs, train_df["label"], val_inputs, val_df["label"], processor
 
 
 #定義 PyTorch Dataset 類別。ScamDataset 繼承自 torch.utils.data.Dataset
@@ -242,7 +250,7 @@ else:
     print("❌ 未找到 model.pth")
 
 # 本機訓練迴圈,要訓練再取消註解,否則在線上版本一律處於註解狀態
-"""
+
 if __name__ == "__main__": # 只有當我「直接執行這個檔案」時,才執行以下訓練程式(不是被別人 import 使用時)。
     if os.path.exists("model.pth"):
         print("✅ 已找到 model.pth,載入模型跳過訓練")
@@ -281,7 +289,7 @@ if __name__ == "__main__": # 只有當我「直接執行這個檔案」時,才�
             print(f"[Epoch{epoch+1}]Training Loss:{total_loss:.4f}")
         torch.save(model.state_dict(), "model.pth")# 儲存模型權重
         print("✅ 模型訓練完成並儲存為 model.pth")
-"""
+
 
 """
 整個模型中每一個文字(token)始終是一個向量,隨著層數不同,這個向量代表的意義會更高階、更語意、更抽象。
