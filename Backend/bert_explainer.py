@@ -6,14 +6,24 @@
 # re是Python內建的正則表示式(regular expression)模組，在這專案中用來"用關鍵規則篩選文字內容"。
 # requests是一個非常好用的 HTTP 請求套件，能讓你從Python發送GET/POST請求，在專案中用來從Google Drive下載模型檔案(model.pth)。
 # BertTokenizer:從Hugging Face的transformers套件載入一個專用的「分詞器（Tokenizer）」。
+# pip install shap
+
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+import shap
 import torch                
 import re
-import os
-import requests
+import easyocr
+import io
+import numpy as np
 
-
+from PIL import Image
 from huggingface_hub import hf_hub_download
 from transformers import BertTokenizer
+
+
+
 
 # 設定裝置（GPU 優先）
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -107,12 +117,7 @@ def predict_single_sentence(model, tokenizer, sentence, max_len=256):
             risk = "🟢 低風險（正常）"
         # ----------- 根據 label 判斷文字結果 -----------
         pre_label ='詐騙'if label == 1 else '正常'
-        # ----------- 顯示推論資訊（後端終端機） -----------
-        print(f"\n📩 訊息內容：{sentence}")
-        print(f"✅ 預測結果：{'詐騙' if label == 1 else '正常'}")
-        print(f"📊 信心值：{round(prob*100, 2)}")
-        print(f"⚠️ 風險等級：{risk}")
-        # ----------- 回傳結果給呼叫端（通常是 API） -----------
+        
         # 組成一個 Python 字典（對應 API 的 JSON 輸出格式）
         return {
         "label" : pre_label,                  # 預測分類（"詐騙" or "正常"）
@@ -124,98 +129,38 @@ def predict_single_sentence(model, tokenizer, sentence, max_len=256):
 # 這個函式是「對外的簡化版本」：輸入一句文字 → 回傳詐騙判定結果
 # 用在主程式或 FastAPI 後端中，是整個模型預測流程的入口點
 
+# ----------- SHAP可疑詞句擷取 -----------
+def suspicious_tokens(model, tokenizer, text, top_k=3):
 
-#------------ CNN ------------
-def extract_suspicious_tokens_cnn(model, tokenizer, text, top_k=3):
-    model.eval()
-    model.to(device)
-
-    # 清理與編碼輸入文字
-    sentence = re.sub(r"\s+", "", text)
+    sentence = re.sub(r"\s+", "", text)  # 移除所有空白字元（空格、換行等）
     sentence = re.sub(r"[^\u4e00-\u9fffA-Za-z0-9。，！？]", "", sentence)
 
     encoded = tokenizer(sentence,
-                        return_tensors="pt",
-                        truncation=True,
+                        return_tensors="pt",      
+                        truncation=True,          
                         padding="max_length",
-                        max_length=128)
-
+                        max_length=256)        
+    
     input_ids = encoded["input_ids"].to(device)
     attention_mask = encoded["attention_mask"].to(device)
     token_type_ids = encoded["token_type_ids"].to(device)
 
-    # 前向傳遞直到 CNN 輸出
-    with torch.no_grad():
-        hidden_states = model.bert(input_ids=input_ids,
-                                   attention_mask=attention_mask,
-                                   token_type_ids=token_type_ids).last_hidden_state
-        lstm_out, _ = model.LSTM(hidden_states)
-        conv_input = lstm_out.transpose(1, 2)
-        conv_out = model.conv1(conv_input)  # conv_out = [batch, 128, seq_len]
-
-    # 這裡會將conv_out的輸出[batch, 128, seq_len]，壓縮成[seq_len]，也就是轉換成bert編碼形勢的句子。
-    token_scores = conv_out.mean(dim=1).squeeze()
-
-    # torch.topk(token_scores, top_k)會得到分數高的token，和對應索引位置，.indices只留下索引，.cpu()把結果從GPU移到CPU（必要才能轉為 list），
-    # .tolist()轉化成list格式。挑出重要性最高的幾個 token 的位置索引。
-    topk_indices = torch.topk(token_scores, top_k).indices.cpu().tolist()
-
-    """ 
-    tokenizer.convert_ids_to_tokens(input_ids.squeeze())將bert編碼還原成原始文字
-    這段input_ids = encoded["input_ids"].to(device)輸出的編碼，還原成文字
-    .squeeze() 去掉 batch 維度，得到 [seq_len]。
-    [tokens[i] for i in topk_indices if tokens[i] not in ["[PAD]", "[CLS]", "[SEP]"]]
-    上面的程式碼為，i為topk_indices挑出的索引，token[i]為分數最高的文字，也就是可疑的詞句。
-    not in 就能避免選到就能避免選到[CLS]、[SEP]、 [PAD]
-    [CLS] 開始符號 = 101
-    [SEP] 結束符號 = 102
-    [PAD] 補空白 = 0
-    """
-    tokens = tokenizer.convert_ids_to_tokens(input_ids.squeeze())
-    suspicious_tokens = [tokens[i] for i in topk_indices if tokens[i] not in ["[PAD]", "[CLS]", "[SEP]"]]
-
-    return suspicious_tokens
-
-
-#------------ Bert Attention ------------
-def extract_suspicious_tokens_attention(model, tokenizer, text, top_k=3):
-    from transformers import BertModel  # 避免重複 import
-
-    sentence = re.sub(r"\s+", "", text)
-    sentence = re.sub(r"[^\u4e00-\u9fffA-Za-z0-9。，！？]", "", sentence)
-
-    encoded = tokenizer(sentence,
-                        return_tensors="pt",
-                        truncation=True,
-                        padding="max_length",
-                        max_length=128)
-
-    input_ids = encoded["input_ids"].to(device)
-    attention_mask = encoded["attention_mask"].to(device)
-    token_type_ids = encoded["token_type_ids"].to(device)
-
-    with torch.no_grad():
-        bert_outputs = model.bert(input_ids=input_ids,
-                                  attention_mask=attention_mask,
-                                  token_type_ids=token_type_ids,
-                                  output_attentions=True)
-        # 取第一層第0個 head 的 attention（CLS → all tokens）
-        """
-        attentions[0]第 0 層 attention（BERT 第 1 層），[0, 0, 0, :]取出第 0 個 batch、第 0 個 head、第 0 個 token（CLS）對所有 token 的注意力分數
-        
-        """
-        attention_scores = bert_outputs.attentions[0][0, 0, 0, :]  # [seq_len]
+    def forward_fn(input_ids):
+        with torch.no_grad():
+            output = model(input_ids = input_ids,
+                           attention_mask = attention_mask,
+                           token_type_ids = token_type_ids)
+        return output.cpu().numpy()
+    explainer = shap.Explainer(forward_fn, masker=shap.maskers.Independeny(input_ids.cpu(), max_samples=256))
+    shap_values = explainer(input_ids)
+    scores = shap_values.values[0]
+    topk_indices = np.argsort(scores)[-top_k:][::-1]
     
-    topk_indices = torch.topk(attention_scores, top_k).indices.cpu().tolist()
-    
-    tokens = tokenizer.convert_ids_to_tokens(input_ids.squeeze())
-    suspicious_tokens = [tokens[i] for i in topk_indices if tokens[i] not in ["[PAD]", "[CLS]", "[SEP]"]]
-
+    tokens =tokenizer.convert_ids_to_tokens(input_ids.squeeze())
+    suspicious_tokens = [tokens[i] for i in topk_indices if tokens[i] not in ["[PAD]","[CLS]","[SEP]"]]
     return suspicious_tokens
-
-
-
-def analyze_text(text, explain_mode="cnn"):
+    
+def analyze_text(text):
     model, tokenizer = load_model_and_tokenizer()
     model.eval()
 
@@ -224,20 +169,35 @@ def analyze_text(text, explain_mode="cnn"):
     label = result["label"]
     prob = result["prob"]
     risk = result["risk"]
-    # 根據模式擷取可疑詞
-    if explain_mode == "cnn":
-        suspicious = extract_suspicious_tokens_cnn(model, tokenizer, text)
-    elif explain_mode == "bert":
-        suspicious = extract_suspicious_tokens_attention(model, tokenizer, text)
-    elif explain_mode == "both":
-        cnn_tokens = extract_suspicious_tokens_cnn(model, tokenizer, text)
-        bert_tokens = extract_suspicious_tokens_attention(model, tokenizer, text)
-        suspicious = list(set(cnn_tokens + bert_tokens))
-    else:
-        suspicious = [risk]  # fallback 傳回風險詞組
 
+    # 擷取可疑詞
+    suspicious = suspicious_tokens(model, tokenizer, text)
+    
+    # ----------- 顯示推論資訊（後端終端機） -----------
+    print(f"\n📩 訊息內容：{text}")
+    print(f"✅ 預測結果：{'詐騙' if label == 1 else '正常'}")
+    print(f"📊 信心值：{round(prob*100, 2)}")
+    print(f"⚠️ 風險等級：{risk}")
+    print(f"SHAP 可疑關鍵字擷取: {[str(s) for s in suspicious]}")
+    
     return {
         "status": label,
         "confidence": round(prob * 100, 2),
-        "suspicious_keywords": suspicious
+        "suspicious_keywords": [str(s) for s in suspicious]
     }
+
+def analyze_image(file_bytes, explain_mode = "cnn"):
+    image = Image.open(io.BytesIO(file_bytes))
+    image_np = np.array(image)
+    reader = easyocr.Reader(['ch_tra', 'en'], gpu=torch.cuda.is_available())
+    results = reader.readtext(image_np)
+    
+    text = ' '.join([res[1] for res in results]).strip()
+    
+    if not text:
+        return{
+            "status" : "無法辨識文字",
+            "confidence" : 0.0,
+            "suspicious_keywords" : ["圖片中無可辨識的中文英文"]
+        }
+    return analyze_text(text)

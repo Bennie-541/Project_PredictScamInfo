@@ -35,17 +35,18 @@ INFO:     Uvicorn running on http://127.0.0.1:8000
 INFO:     Started reloader process...
 """
 
-from fastapi import FastAPI, HTTPException                   # 匯入 FastAPI 主功能模組與 HTTP 錯誤處理
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form                 # 匯入 FastAPI 主功能模組與 HTTP 錯誤處理
 from fastapi.middleware.cors import CORSMiddleware           # 匯入 CORS 模組：用來允許前端跨來源存取 API
 from pydantic import BaseModel                               # 用於定義 API 的資料結構模型
 from datetime import datetime                                # 處理時間格式(如分析時間戳)
 from typing import Optional, List                            # 型別註解：可選、列表
-from bert_explainer import analyze_text  # 匯入自定義的 BERT 模型分析函式
+from bert_explainer import analyze_text, analyze_image  # 匯入自定義的 BERT 模型分析函式
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 import os
+import requests
 
 # ---------------- 初始化 FastAPI 應用 ---------------
 #團隊合作:前端工程師、測試人員知道你這API做什麼。會影響 /docs 文件清晰度與專案可讀性,在專案開發與交接時非常有用。
@@ -75,7 +76,6 @@ app.add_middleware(
 class TextAnalysisRequest(BaseModel):# 接收前端
     text: str                        # 使用者輸入的訊息
     user_id: Optional[str] = None    # 可選的使用者 ID
-    explain_mode: Optional[str] = "cnn" # 選擇以甚麼模式擷取可疑關鍵字
     
 class TextAnalysisResponse(BaseModel): # 回傳前端
     status: str                      # 預測結果：詐騙/正常
@@ -117,8 +117,8 @@ async def root():
 @app.post("/predict", response_model=TextAnalysisResponse)
 async def analyze_text_api(request: TextAnalysisRequest):
         try:
-            print("📥 收到請求：", request.text, "| 模式:", request.explain_mode)
-            result = analyze_text(request.text, request.explain_mode)
+            print("📥 收到請求：", request.text)
+            result = analyze_text(request.text)
             print("✅ 模型回傳結果：", result)
             return TextAnalysisResponse(
             status=result["status"],
@@ -129,6 +129,20 @@ async def analyze_text_api(request: TextAnalysisRequest):
         except Exception as e:
             print("❌ 錯誤訊息：", str(e))
             raise HTTPException(status_code=500, detail="內部伺服器錯誤")
+
+@app.post("/predict-image")
+async def predict_image(file: UploadFile = File(...)):
+    image_bytes = await file.read()
+    files = {
+        "file": ("image.png", image_bytes, file.content_type),
+    }
+    # 正確轉發 multipart/form-data
+    response = requests.post(
+        "https://bennie12-project-predictscaminfo.hf.space/run/predict_image",
+        files=files
+    )
+    return response.json()
+
 """
 使用模型分析該文字(實際邏輯在 bert_explainer.py)
          呼叫模型進行詐騙分析,這會呼叫模型邏輯(在bert_explainer.py),把輸入文字送去分析,得到像這樣的回傳結果(假設)：

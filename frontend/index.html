@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>預測詐騙訊息</title>
     <link rel="stylesheet" href="style.css"><!-- 引入外部 CSS 樣式 -->
+    <script src="script.js"></script> <!-- 引入 JavaScript 檔案 -->
 </head>
 <body>
     <h1>檢查可疑訊息</h1><!-- <h1>字體最大標題，最小<h6>-->
@@ -17,15 +18,14 @@
             <div class="button-group">
                 <button id="detect_button" type="submit">檢測</button><!---->
                 <button id="clear_button" type="reset">清除</button>
-                <!-- 新增：選擇解釋模式 -->
-            <div class="mode-select-group">
-                <label for="modeSelect">語意解釋模式：</label>
-                <select id="modeSelect">
-                    <option value="cnn">快速檢測（CNN）</option>
-                    <option value="bert">語意分析（BERT Attention）</option>
-                    <option value="both">雙重檢測（CNN + BERT）</option>
-                </select>
+
+             <!-- 圖片上傳與檢測功能 -->
+            <div class="image-upload-group" style="margin-top: 20px;">
+                <label for="imageInput">或上傳圖片進行詐騙檢測：</label><br>
+                <input type="file" id="imageInput" accept="image/*" />
+                <button id="image_button" type="button" style="margin-left: 10px;">圖片檢測</button>
             </div>
+
             </div>
         </section>
         <!-- 顯示模型預測結果的區塊 -->
@@ -39,6 +39,6 @@
                 <p>請輸入訊息並點擊「檢測」按鈕。</p>
             </div>
         </section>
-    </div> <script src="script.js"></script> <!-- 引入 JavaScript 檔案 -->
+    </div>
 </body>
 </html>

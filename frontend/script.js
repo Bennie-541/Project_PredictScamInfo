@@ -16,9 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     在開發階段，通常是 http://127.0.0.1:8000 或 http://localhost:8000
     請根據你實際運行 FastAPI 的位址和 Port 進行設定
      */
-    const API_URL = window.location.hostname.includes("127.0.0.1") || window.location.hostname.includes("localhost")
-  ? "http://127.0.0.1:8000/predict"
-  : "https://your-production-api-url/predict";
+    const API_URL = "http://127.0.0.1:8000/predict";
 
 
     // --- 檢測按鈕點擊事件監聽器 ---
@@ -45,7 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
         try {//try...catch處理程式錯誤。
 //fetch(API_URL, {...})。API_URL第17段的變數。method:為html方法，POST送出請求。headers告訴伺服器傳送的資料格式是什麼。
 //這段是用 fetch 來呼叫後端 API，送出 POST 請求：
-            const mode = document.getElementById('modeSelect').value;
             const response = await fetch(API_URL, {     
                 method: 'POST', // 指定 HTTP 方法為 POST
                 headers: {      // 告訴伺服器發送的資料是 JSON 格式。選JSON原因:
@@ -53,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Content-Type': 'application/json'
                 },
                 //把JavaScript物件{text:message}轉換成JSON格式字串，字串作為請求的主體 (body)
-                body: JSON.stringify({ text: message , explain_mode : mode}), 
+                body: JSON.stringify({ text: message}), 
             });
 
             // 檢查 HTTP 回應是否成功 (例如：狀態碼 200 OK)
@@ -75,6 +72,47 @@ document.addEventListener('DOMContentLoaded', () => {
             alert(`訊息檢測失敗，請檢查後端服務是否運行或網路連線。\n錯誤詳情: ${error.message}`); // 彈出錯誤提示
             resetResults();                      // 將介面恢復到初始狀態
         }
+    });
+
+    imageButton.addEventListener('click', async()=>{
+        const file = imageInput.files[0]; //取得上傳相片
+        if (!file){
+            alert("請先選擇圖片");
+            return;
+        }
+        // 顯示載入中提示
+        normalOrScam.textContent = '圖片分析中...';
+        normalOrScam.style.color = 'gray';
+        confidenceScoreSpan.textContent = '計算中...';
+        suspiciousPhrasesDiv.innerHTML = '<p>正在從圖片擷取文字與分析中...</p>';
+
+        try{
+            const formData = new FormData();
+            formData.append("file", file); // 附加圖片檔案給後端
+            const response = await fetch(API_IMAGE_URL,{
+                    method : "POST",
+                    body : formData
+            });
+            if (!response.ok){
+                throw new Error(`圖片分析失敗: ${response.status} ${response.statusText}`);
+            }
+            const data = await response.json();
+            updateResults(
+                data.status,
+                data.confidence,
+                data.suspicious_keywords
+            )
+        }catch(error) {
+            console.error("圖片上傳失敗",error);
+            alert("圖片分析失敗")
+            resetResults();
+        }
+    });
+    // --- 清除按鈕點擊事件監聽器 ---
+    // 當清除按鈕被點擊時，執行函數
+    clearButton.addEventListener('click', () => {
+        inputTextArea.value = '';// 清空輸入框內容
+        resetResults();          // 重置顯示結果
     });
 
     // --- 清除按鈕點擊事件監聽器 ---
