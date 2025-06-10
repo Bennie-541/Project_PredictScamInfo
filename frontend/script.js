@@ -113,10 +113,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    function highlightSuspiciousWords(text, suspiciousParts) {
+    function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function highlightSuspiciousWords(text, suspiciousParts) {
     let highlighted = text;
     suspiciousParts.forEach(word => {
-        const pattern = new RegExp(word, 'g');
+        if (word.length < 2) return; // 避免標記太短詞（如單個字或符號）
+        const pattern = new RegExp(escapeRegExp(word), 'g');
         highlighted = highlighted.replace(pattern, `<span class="highlight">${word}</span>`);
     });
     return highlighted;
