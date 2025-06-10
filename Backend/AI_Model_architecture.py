@@ -26,6 +26,10 @@ import torch.nn as nn                   #	神經網路相關的層(例如 LSTM�
 import pandas as pd
 import re
 import ast
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from dotenv import load_dotenv
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset #	提供 Dataset、DataLoader 類別
@@ -34,8 +38,8 @@ from sklearn.model_selection import train_test_split
 from transformers import BertModel
 
 # ------------------- 載入 .env 環境變數 -------------------
-load_dotenv()
-base_dir = os.getenv("DATA_DIR", "./data")  # 如果沒設環境變數就預設用 ./data
+
+path = r"E:\Project_PredictScamInfo"
 
 # ------------------- 使用相對路徑找 CSV -------------------
 
@@ -54,7 +58,7 @@ class BertPreprocessor:
 
     def load_and_clean(self, filepath):
         df = pd.read_csv(filepath)
-        df = df.dropna().drop_duplicates().reset_index(drop=True)
+        df = df.dropna().drop_duplicates(subset=["message"]).reset_index(drop=True)
 
         # 清理 message 欄位
         df["message"] = df["message"].astype(str)
@@ -91,7 +95,8 @@ def build_bert_inputs(files):
     processor = BertPreprocessor()
     dfs = [processor.load_and_clean(f) for f in files]
     all_df = pd.concat(dfs, ignore_index=True)
-
+    print("📌 原始資料筆數：", sum(len(pd.read_csv(f)) for f in files))
+    print("📌 清理後資料筆數：", len(all_df))
     print(f"✅ 已讀入 {len(all_df)} 筆資料")
     print(all_df["label"].value_counts())
     print("📌 合併後輸入示例：")
@@ -134,7 +139,7 @@ class ScamDataset(Dataset):
 
 # 這樣可以同時處理 scam 和 normal 資料,不用重複寫清理與 token 處理
 if __name__ == "__main__":
-    csv_files = [os.path.join(base_dir, r"E:\Project_PredictScamInfo\final_keywords_refined.csv")]
+    csv_files = [os.path.join(path, r"Filled_Keyword_MessageDeduplicated.csv")]
     train_inputs, train_labels, val_inputs, val_labels, processor = build_bert_inputs(csv_files)
     
     train_dataset = ScamDataset(train_inputs, train_labels)
@@ -231,7 +236,7 @@ logits = [[0.92], [0.05], [0.88], [0.41], ..., [0.17]]
 → sigmoid → [[0.715], [0.512], ...]
 → squeeze → [0.715, 0.512, ...]
 """
-        return torch.sigmoid(logits).squeeze() # 最後輸出是一個值介於 0 ~ 1 之間,代表「為詐騙訊息的機率」。
+        return logits.squeeze() # 最後輸出是一個值介於 0 ~ 1 之間,代表「為詐騙訊息的機率」。
         
 # 設定 GPU 裝置
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -240,21 +245,15 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = BertLSTM_CNN_Classifier().to(device)
 # 定義 optimizer 和損失函數
 optimizer = torch.optim.Adam(model.parameters(),lr=2e-5)
-criterion = nn.BCELoss()
-
-#只保留推論即可,模型訓練應該在本地完成！
-if os.path.exists("model.pth"):
-    print("✅ 已找到 model.pth,載入模型跳過訓練")
-    model.load_state_dict(torch.load("model.pth", map_location=device))
-else:
-    print("❌ 未找到 model.pth")
+pos_weight = torch.tensor([2.13], dtype=torch.float32).to(device)
+criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
 # 本機訓練迴圈,要訓練再取消註解,否則在線上版本一律處於註解狀態
 
 if __name__ == "__main__": # 只有當我「直接執行這個檔案」時,才執行以下訓練程式(不是被別人 import 使用時)。
     if os.path.exists("model.pth"):
         print("✅ 已找到 model.pth,載入模型跳過訓練")
-        model.load_state_dict(torch.load("model.pth", map_location=device))
+        model.load_state_dict(os.path.join(os.path.dirname(__file__), "model.pth"))
     else:
         print("🚀 未找到 model.pth,開始訓練模型...")
         num_epochs = 15 # batch_size設定在train_loader和test_loader那
@@ -287,11 +286,43 @@ if __name__ == "__main__": # 只有當我「直接執行這個檔案」時,才�
                 # loss 是一個 tensor(需要 backward);.item() 把它轉成 Python 的純數字(float)
                 total_loss += loss.item()
             print(f"[Epoch{epoch+1}]Training Loss:{total_loss:.4f}")
-        torch.save(model.state_dict(), "model.pth")# 儲存模型權重
+        torch.save(os.path.join(os.path.dirname(__file__)), "model.pth")# 儲存模型權重
         print("✅ 模型訓練完成並儲存為 model.pth")
 
+if __name__ == "__main__":
+    def evaluate_model(model, val_loader, device="cuda" if torch.cuda.is_available() else "cpu"):
+        model.eval()
+        y_true = []
+        y_pred = []
+
+        with torch.no_grad():
+            for batch in val_loader:
+                input_ids = batch["input_ids"].to(device)
+                attention_mask = batch["attention_mask"].to(device)
+                token_type_ids = batch["token_type_ids"].to(device)
+                labels = batch["labels"].to(device)
+
+                # 如果你用 BCEWithLogitsLoss，這裡不要做 sigmoid（模型輸出是 logits）
+                outputs = model(input_ids, attention_mask, token_type_ids)
+
+                # 假設你輸出已經是經過 sigmoid（目前是），就可以直接比較
+                preds = (outputs > 0.5).long()
+
+                y_true.extend(labels.cpu().numpy())
+                y_pred.extend(preds.cpu().numpy())
+
+        acc = accuracy_score(y_true, y_pred)
+        report = classification_report(y_true, y_pred, digits=4)
+        cm = confusion_matrix(y_true, y_pred)
+
+        print("🎯 模型在驗證集上的準確度 (Accuracy): {:.4f}".format(acc))
+        print("📋 分類報告 (Classification Report):\n", report)
+        print("🔍 混淆矩陣 (Confusion Matrix):\n", cm)
+print("✅ 開始驗證模型效果...")
+evaluate_model(model, val_loader, device)
 
 """
+
 整個模型中每一個文字(token)始終是一個向量,隨著層數不同,這個向量代表的意義會更高階、更語意、更抽象。
 在整個 BERT + LSTM + CNN 模型的流程中,「每一個文字(token)」都會被表示成一個「向量」來進行後續的計算與學習。
 今天我輸入一個句子:"早安你好,吃飯沒"
