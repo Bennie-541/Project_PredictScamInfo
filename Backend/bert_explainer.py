@@ -125,28 +125,39 @@ def suspicious_tokens(model, tokenizer, text, top_k=4):
     print(f"📥 資料型別：{type(text)}")
 
     if not isinstance(text, str) or not text.strip():
-        print("❌ 警告：輸入不是合法文字，直接返回空列表")
+        print("❌ 輸入不是合法文字，返回空列表")
         return []
-    if len(text.strip()) < 4:  # ✅ 如果輸入太短，直接跳過擾動，避免錯誤
-        print("⚠️ 警告：文字長度過短（少於4字），跳過LIME分析")
-        return []
-    
-    def predict_proba(texts):
 
+    def clean_text(text):
+        # 清除電話、網址、時間、亂碼
+        text = re.sub(r"https?://\S+", "", text)                      # 移除網址
+        text = re.sub(r"[a-zA-Z0-9:/.%\-_=+]{4,}", "", text)          # 移除亂碼段
+        text = re.sub(r"\+?\d[\d\s\-]{5,}", "", text)                 # 移除電話
+        text = re.sub(r"[^\u4e00-\u9fa5。，！？、]", "", text)         # 僅保留中文與標點
+        return text
+
+    text = clean_text(text)
+    print(f"🧼 清洗後文字：{text}")
+
+    if len(text) < 4:
+        print("⚠️ 文字太短，跳過LIME")
+        return []
+
+    def predict_proba(texts):
         encoding = tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=256)
         encoding = {k: v.to(device) for k, v in encoding.items()}
         with torch.no_grad():
             outputs = model(encoding["input_ids"], encoding["attention_mask"], encoding["token_type_ids"])
             probs = torch.stack([1 - outputs, outputs], dim=1)
-
         return probs.cpu().numpy()
 
     class_names = ['正常', '詐騙']
     explainer = LimeTextExplainer(
-    class_names=class_names,
-    split_expression='',  # ✅ 每字為擾動單位（適合中文）
-    bow=False             # ✅ 保留語序與上下文語義
-)
+        class_names=class_names,
+        split_expression='',  # ✅ 每字擾動，最穩定
+        bow=False
+    )
+
     try:
         explanation = explainer.explain_instance(
             text, predict_proba,
@@ -155,14 +166,15 @@ def suspicious_tokens(model, tokenizer, text, top_k=4):
             num_samples=700
         )
         keyword_scores = explanation.as_list(label=1)
-        keywords = [word for word, score in keyword_scores]
-        print(f"關鍵字長:{keywords}")
+        keywords = [
+            word for word, score in keyword_scores
+            if len(word.strip()) > 1 and not re.match(r"^[。，！？、]+$", word)
+        ]
+        print(f"✅ 擷取到的可疑關鍵字: {keywords}")
         return keywords
     except Exception as e:
         print(f"⚠️ LIME 擾動分析失敗：{e}")
         return []
-
-
     
 def analyze_text(text):
     model, tokenizer = load_model_and_tokenizer()
@@ -182,12 +194,12 @@ def analyze_text(text):
     print(f"✅ 預測結果：{label}")  
     print(f"📊 信心值：{round(prob*100, 2)}")
     print(f"⚠️ 風險等級：{risk}")
-    print(f"可疑關鍵字擷取: {[str(s) for s in suspicious]}")
+    print(f"可疑關鍵字擷取: { [str(s).strip() for s in suspicious if isinstance(s, str) and len(s.strip()) > 1]}")
     
     return {
         "status": label,
         "confidence": round(prob * 100, 2),
-        "suspicious_keywords": [str(s) for s in suspicious]
+        "suspicious_keywords":  [str(s).strip() for s in suspicious if isinstance(s, str) and len(s.strip()) > 1]
     }
 
 def analyze_image(file_bytes):

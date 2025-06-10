@@ -29,12 +29,13 @@ import ast
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
 from dotenv import load_dotenv
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset #	提供 Dataset、DataLoader 類別
 from transformers import BertTokenizer # BertTokenizer把文字句子轉換成 BERT 格式的 token ID,例如 [CLS] 今天 天氣 不錯 [SEP] → [101, 1234, 5678, ...]
 from sklearn.model_selection import train_test_split
+
 from transformers import BertModel
 
 # ------------------- 載入 .env 環境變數 -------------------
@@ -251,9 +252,10 @@ criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 # 本機訓練迴圈,要訓練再取消註解,否則在線上版本一律處於註解狀態
 
 if __name__ == "__main__": # 只有當我「直接執行這個檔案」時,才執行以下訓練程式(不是被別人 import 使用時)。
-    if os.path.exists("model.pth"):
+    model_path = os.path.join(os.path.dirname(__file__), "model.pth")
+    if os.path.exists(model_path):
         print("✅ 已找到 model.pth,載入模型跳過訓練")
-        model.load_state_dict(os.path.join(os.path.dirname(__file__), "model.pth"))
+        model.load_state_dict(torch.load(model_path, map_location=device))
     else:
         print("🚀 未找到 model.pth,開始訓練模型...")
         num_epochs = 15 # batch_size設定在train_loader和test_loader那
@@ -261,6 +263,7 @@ if __name__ == "__main__": # 只有當我「直接執行這個檔案」時,才�
             model.train() # 從nn.Module繼承的方法。將模型設為「訓練模式」,有些層(像 Dropout 或 BatchNorm)會啟用訓練行為。
             total_loss = 0.0
             for batch in train_loader:
+            
             
                 # 清理舊梯度,以免累加。為甚麼要?因為PyTorch 預設每次呼叫 .backward() 都會「累加」梯度(不會自動清掉)
                 # 沒 .zero_grad(),梯度會越累積越多,模型會亂掉。
@@ -286,40 +289,60 @@ if __name__ == "__main__": # 只有當我「直接執行這個檔案」時,才�
                 # loss 是一個 tensor(需要 backward);.item() 把它轉成 Python 的純數字(float)
                 total_loss += loss.item()
             print(f"[Epoch{epoch+1}]Training Loss:{total_loss:.4f}")
-        torch.save(os.path.join(os.path.dirname(__file__)), "model.pth")# 儲存模型權重
+        torch.save(model.state_dict(), model_path)# 儲存模型權重
         print("✅ 模型訓練完成並儲存為 model.pth")
 
+def evaluate_model(model, val_loader, device="cuda" if torch.cuda.is_available() else "cpu"):
+    model.eval()
+    y_true = []
+    y_pred = []
+
+    with torch.no_grad():
+        for batch in val_loader:
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
+            token_type_ids = batch["token_type_ids"].to(device)
+            label_batch = batch["labels"].to(device)  # ✅ 避免與下方 label_name 衝突
+
+            outputs = model(input_ids, attention_mask, token_type_ids)
+            preds = (outputs > 0.5).long()
+
+            y_true.extend(label_batch.cpu().numpy())
+            y_pred.extend(preds.cpu().numpy())
+    
+      # 各項評估指標
+    acc = accuracy_score(y_true, y_pred)
+    prec = precision_score(y_true, y_pred)
+    rec = recall_score(y_true, y_pred)
+    f1 = f1_score(y_true, y_pred)
+
+    print("✅ 模型驗證結果：")
+    print(f"Accuracy  : {acc:.4f}")
+    print(f"Precision : {prec:.4f}")
+    print(f"Recall    : {rec:.4f}")
+    print(f"F1-score  : {f1:.4f}")
+
+    # 混淆矩陣
+    cm = confusion_matrix(y_true, y_pred)
+    label_names = ["Scam (0)", "Normal (1)"]
+
+    plt.figure(figsize=(6, 5))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=label_names, yticklabels=label_names)
+    plt.xlabel("Predict")
+    plt.ylabel("Actual")
+    plt.title("🔍 Confusion Matrix")
+    plt.tight_layout()
+    plt.show()
+
+    # 評估報告
+    report = classification_report(y_true, y_pred, target_names=label_names, digits=4)
+    print("📋 分類報告 (Classification Report):\n", report)
+
+
+# 放在主程式中呼叫
 if __name__ == "__main__":
-    def evaluate_model(model, val_loader, device="cuda" if torch.cuda.is_available() else "cpu"):
-        model.eval()
-        y_true = []
-        y_pred = []
-
-        with torch.no_grad():
-            for batch in val_loader:
-                input_ids = batch["input_ids"].to(device)
-                attention_mask = batch["attention_mask"].to(device)
-                token_type_ids = batch["token_type_ids"].to(device)
-                labels = batch["labels"].to(device)
-
-                # 如果你用 BCEWithLogitsLoss，這裡不要做 sigmoid（模型輸出是 logits）
-                outputs = model(input_ids, attention_mask, token_type_ids)
-
-                # 假設你輸出已經是經過 sigmoid（目前是），就可以直接比較
-                preds = (outputs > 0.5).long()
-
-                y_true.extend(labels.cpu().numpy())
-                y_pred.extend(preds.cpu().numpy())
-
-        acc = accuracy_score(y_true, y_pred)
-        report = classification_report(y_true, y_pred, digits=4)
-        cm = confusion_matrix(y_true, y_pred)
-
-        print("🎯 模型在驗證集上的準確度 (Accuracy): {:.4f}".format(acc))
-        print("📋 分類報告 (Classification Report):\n", report)
-        print("🔍 混淆矩陣 (Confusion Matrix):\n", cm)
-print("✅ 開始驗證模型效果...")
-evaluate_model(model, val_loader, device)
+    print("✅ 開始驗證模型效果...")
+    evaluate_model(model, val_loader, device)
 
 """
 
