@@ -24,7 +24,7 @@ from transformers import BertTokenizer
 
 
 
-
+reader = easyocr.Reader(['ch_tra', 'en'], gpu=torch.cuda.is_available())
 # 設定裝置（GPU 優先）
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # 預設模型與 tokenizer 為 None，直到首次請求才載入（延遲載入）
@@ -119,7 +119,7 @@ def predict_single_sentence(model, tokenizer, sentence, max_len=256):
 # 用在主程式或 FastAPI 後端中，是整個模型預測流程的入口點
 
 # ----------- LIME可疑詞句擷取 -----------
-def suspicious_tokens(model, tokenizer, text, top_k=3):
+def suspicious_tokens(model, tokenizer, text, top_k=4):
     print("\n🔍 [suspicious_tokens] 函式被呼叫")
     print(f"📥 傳入文字內容：{text}")
     print(f"📥 資料型別：{type(text)}")
@@ -127,7 +127,10 @@ def suspicious_tokens(model, tokenizer, text, top_k=3):
     if not isinstance(text, str) or not text.strip():
         print("❌ 警告：輸入不是合法文字，直接返回空列表")
         return []
-
+    if len(text.strip()) < 4:  # ✅ 如果輸入太短，直接跳過擾動，避免錯誤
+        print("⚠️ 警告：文字長度過短（少於4字），跳過LIME分析")
+        return []
+    
     def predict_proba(texts):
 
         encoding = tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=256)
@@ -139,13 +142,25 @@ def suspicious_tokens(model, tokenizer, text, top_k=3):
         return probs.cpu().numpy()
 
     class_names = ['正常', '詐騙']
-    explainer = LimeTextExplainer(class_names=class_names, split_expression=r'\s+|[。，！？]')
-    explanation = explainer.explain_instance(text, predict_proba, num_features=top_k, labels=[1])
-
-    keyword_scores = explanation.as_list(label=1)
-
-    keywords = [word for word, score in keyword_scores]
-    return keywords
+    explainer = LimeTextExplainer(
+    class_names=class_names,
+    split_expression='',  # ✅ 每字為擾動單位（適合中文）
+    bow=False             # ✅ 保留語序與上下文語義
+)
+    try:
+        explanation = explainer.explain_instance(
+            text, predict_proba,
+            num_features=top_k,
+            labels=[1],
+            num_samples=700
+        )
+        keyword_scores = explanation.as_list(label=1)
+        keywords = [word for word, score in keyword_scores]
+        print(f"關鍵字長:{keywords}")
+        return keywords
+    except Exception as e:
+        print(f"⚠️ LIME 擾動分析失敗：{e}")
+        return []
 
 
     
@@ -167,7 +182,7 @@ def analyze_text(text):
     print(f"✅ 預測結果：{label}")  
     print(f"📊 信心值：{round(prob*100, 2)}")
     print(f"⚠️ 風險等級：{risk}")
-    print(f"SHAP 可疑關鍵字擷取: {[str(s) for s in suspicious]}")
+    print(f"可疑關鍵字擷取: {[str(s) for s in suspicious]}")
     
     return {
         "status": label,
@@ -178,7 +193,6 @@ def analyze_text(text):
 def analyze_image(file_bytes):
     image = Image.open(io.BytesIO(file_bytes))
     image_np = np.array(image)
-    reader = easyocr.Reader(['ch_tra', 'en'], gpu=torch.cuda.is_available())
     results = reader.readtext(image_np)
     
     text = ' '.join([res[1] for res in results]).strip()

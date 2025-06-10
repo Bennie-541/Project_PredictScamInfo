@@ -25,7 +25,7 @@ import torch                            #   PyTorch 主模組
 import torch.nn as nn                   #	神經網路相關的層(例如 LSTM、Linear)        
 import pandas as pd
 import re
-
+import ast
 from dotenv import load_dotenv
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset #	提供 Dataset、DataLoader 類別
@@ -38,7 +38,7 @@ load_dotenv()
 base_dir = os.getenv("DATA_DIR", "./data")  # 如果沒設環境變數就預設用 ./data
 
 # ------------------- 使用相對路徑找 CSV -------------------
-#,os.path.join(base_dir, "NorANDScamInfo_data1.csv"),os.path.join(base_dir, "ScamInfo_data1.csv"),os.path.join(base_dir, "NormalInfo_data1.csv")
+
 #如有需要訓練複數筆資料可以使用這個方法csv_files = [os.path.join(base_dir, "檔案名稱1.csv"),os.path.join(base_dir, "檔案名稱2.csv")]
 #程式碼一至131行
 
@@ -134,7 +134,7 @@ class ScamDataset(Dataset):
 
 # 這樣可以同時處理 scam 和 normal 資料,不用重複寫清理與 token 處理
 if __name__ == "__main__":
-    csv_files = [os.path.join(base_dir, "NorANDScamInfo_data3k.csv")]
+    csv_files = [os.path.join(base_dir, r"E:\Project_PredictScamInfo\final_keywords_refined.csv")]
     train_inputs, train_labels, val_inputs, val_labels, processor = build_bert_inputs(csv_files)
     
     train_dataset = ScamDataset(train_inputs, train_labels)
@@ -142,8 +142,8 @@ if __name__ == "__main__":
 
     # batch_size每次送進模型的是 8 筆資料(而不是一筆一筆)
     # 每次從 Dataset 中抓一批(batch)資料出來
-    train_loader = DataLoader(train_dataset, batch_size=8)
-    val_loader = DataLoader(val_dataset, batch_size=8)
+    train_loader = DataLoader(train_dataset, batch_size=128)
+    val_loader = DataLoader(val_dataset, batch_size=128)
 
 """
 class BertLSTM_CNN_Classifier(nn.Module)表示:你定義了一個子類別,

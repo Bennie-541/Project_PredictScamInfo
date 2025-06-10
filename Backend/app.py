@@ -14,6 +14,7 @@ pip install --upgrade torch --extra-index-url https://download.pytorch.org/whl/c
 pip install --upgrade torch --index-url https://download.pytorch.org/whl/cpu
 pip install tqdm
 pip install easyocr
+pip install lime
 
 
 ---測試本地前後端連接---
