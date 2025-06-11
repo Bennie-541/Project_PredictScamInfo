@@ -11,7 +11,7 @@
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-from lime.lime_text import LimeTextExplainer
+import shap
 import torch                
 import re
 import easyocr
@@ -20,52 +20,35 @@ import numpy as np
 
 from PIL import Image
 from huggingface_hub import hf_hub_download
-from transformers import BertTokenizer
-
+from transformers import BertTokenizer, pipeline
+from AI_Model_architecture import BertLSTM_CNN_Classifier
 
 
 reader = easyocr.Reader(['ch_tra', 'en'], gpu=torch.cuda.is_available())
 # 設定裝置（GPU 優先）
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # 預設模型與 tokenizer 為 None，直到首次請求才載入（延遲載入）
-model = None
-tokenizer = None
+# 先載入模型與 tokenizer
+
+
 # ✅ 延遲載入模型與 tokenizer
 def load_model_and_tokenizer():
     global model, tokenizer
+
     if os.path.exists("model.pth"):
         model_path = "model.pth"
     else:
         model_path = hf_hub_download(repo_id="Bennie12/Bert-Lstm-Cnn-ScamDetecter", filename="model.pth")
-    # 匯入模型架構（避免在模組初始化階段就占用大量記憶體）
-    from AI_Model_architecture import BertLSTM_CNN_Classifier
 
-    # 載入模型架構與參數，初始化模型架構並載入訓練權重
+    from AI_Model_architecture import BertLSTM_CNN_Classifier
     model = BertLSTM_CNN_Classifier()
-    
-    # 這行的功能是：「從 model_path把.pth 權重檔案讀進來，載入進模型裡」。
-    # model.load_state_dict(...)把上面載入的權重「套進模型架構裡」
-    # torch.load(...)載入.pth 權重檔案，會變成一份 Python 字典
-    # map_location=device指定模型載入到 CPU 還是 GPU，避免報錯
     model.load_state_dict(torch.load(model_path, map_location=device))
-    
     model.to(device)
-    
-    # 這是PyTorch中的「推論模式」設定
-    # model.eval()模型處於推論狀態（關掉 Dropout 等隨機操作）
-    # 只要是用來「預測」而不是訓練，一定要加 .eval()！
     model.eval()
 
-    # 初始化 tokenizer(不要從 build_bert_inputs 中取)
-    # 載入預訓練好的CKIP中文BERT分詞器
-    # 能把中文句子轉成 BERT 模型需要的 input 格式（input_ids, attention_mask, token_type_ids）
-    tokenizer = BertTokenizer.from_pretrained("ckiplab/bert-base-chinese", use_fast=False)  # ✅ 強制使用非 fast tokenizer
-
+    tokenizer = BertTokenizer.from_pretrained("ckiplab/bert-base-chinese", use_fast=False)
 
     return model, tokenizer
-
-all_preds = []
-all_labels = []
 
 # 預測單一句子的分類結果（詐騙 or 正常）
 # model: 訓練好的PyTorch模型
@@ -118,89 +101,114 @@ def predict_single_sentence(model, tokenizer, sentence, max_len=256):
 # 這個函式是「對外的簡化版本」：輸入一句文字 → 回傳詐騙判定結果
 # 用在主程式或 FastAPI 後端中，是整個模型預測流程的入口點
 
-# ----------- LIME可疑詞句擷取 -----------
-def suspicious_tokens(model, tokenizer, text, top_k=4):
-    print("\n🔍 [suspicious_tokens] 函式被呼叫")
-    print(f"📥 傳入文字內容：{text}")
-    print(f"📥 資料型別：{type(text)}")
+# ----------- 可疑詞句擷取 -----------
+class ModelWrapper:
+    def __init__(self, model, tokenizer):
+        self.model = model
+        self.tokenizer = tokenizer
 
-    if not isinstance(text, str) or not text.strip():
-        print("❌ 輸入不是合法文字，返回空列表")
-        return []
-
-    def clean_text(text):
-        # 清除電話、網址、時間、亂碼
-        text = re.sub(r"https?://\S+", "", text)                      # 移除網址
-        text = re.sub(r"[a-zA-Z0-9:/.%\-_=+]{4,}", "", text)          # 移除亂碼段
-        text = re.sub(r"\+?\d[\d\s\-]{5,}", "", text)                 # 移除電話
-        text = re.sub(r"[^\u4e00-\u9fa5。，！？、]", "", text)         # 僅保留中文與標點
-        return text
-
-    text = clean_text(text)
-    print(f"🧼 清洗後文字：{text}")
-
-    if len(text) < 4:
-        print("⚠️ 文字太短，跳過LIME")
-        return []
-
-    def predict_proba(texts):
-        encoding = tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=256)
-        encoding = {k: v.to(device) for k, v in encoding.items()}
+    def __call__(self, texts):
+        if isinstance(texts, np.ndarray):
+            texts = texts.tolist()
+        elif isinstance(texts, str):
+            texts = [texts]
+        # 其實到這邊 texts 已經是 list of str
+        encodings = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=256)
+        encodings = {k: v.to(device) for k, v in encodings.items()}
         with torch.no_grad():
-            outputs = model(encoding["input_ids"], encoding["attention_mask"], encoding["token_type_ids"])
-            probs = torch.stack([1 - outputs, outputs], dim=1)
+            outputs = self.model(encodings["input_ids"], encodings["attention_mask"], encodings["token_type_ids"])
+            if len(outputs.shape) == 0:
+                outputs = outputs.unsqueeze(0)
+            probs = torch.stack([1-outputs, outputs], dim=1)
         return probs.cpu().numpy()
+# 背景資料可以使用小樣本即可
+background_data = [
+    "今天下班後有空嗎？想約你去逛逛新開的夜市，聽說很好吃。",
+    "你知道怎麼用圖形計算體積嗎？我找了幾個例題我們一起練。",
+    "怡萱，設計部交來的提案不太符合規格，你幫忙聯絡一下調整字型與配色規範。",
+    "恭喜您！在我們的年用戶回饋活動中，您抽中一台！請在小時內完成登記手續領取補繳逾期將收取手續費。",
+    "您信用卡存在高风险消费记录，需支付安全保障费元，详情请访问",
+    "您好我們是官方客服，發現您的帳戶有異常行為，請回覆您的密碼及手機號碼以便協助處理。",
+    "您好，信用卡账单异常请尽快支付未结款项元，客服热线",
+    "您好，您的手机套餐异常，请支付补缴费用元，微信客服。",
+    "您的手機已中毒，所有應用程式有被遠端操控的危險，請馬上掃描並刪除可疑軟體，點此下載。",
+    "想起你第一次自己搭飛機那天，媽媽其實超緊張的，還偷哭了一下。",
+    "我不是你操控的棋子。",
+    "我現在的狀態就是一個會呼吸的失誤",
+    "擠公車的時候被夾到背包，後面大嬸還一直催我下車",
+    "政府公告您符合老人福利津貼資格，請點擊",
+    "最近有什麼好聽的音樂推薦嗎？我想換換口味。",
+    "有人說台北信義商圈夜晚有人穿古裝逛街，像穿越時空。",
+    "本行系統升級需重新驗證用戶資料，請於小時內完成身份確認程序，否則將暫時凍結帳戶所有交易功能。",
+    "水利署通知，月初將進行自來水管線例行維修，可能短暫停水。",
+    "緊急通知您有一筆防疫補助款待領取，請點擊連結上傳身份證照片及手機驗證碼以完成申請。網址",
+    "親愛的用戶，您的電信合約即將到期，請點擊連結確認續約並享受優惠方案，逾期將自動終止服務。"
+]
 
-    class_names = ['正常', '詐騙']
-    explainer = LimeTextExplainer(
-        class_names=class_names,
-        split_expression='',  # ✅ 每字擾動，最穩定
-        bow=False
-    )
 
+
+def clean_text(text):
+    text = re.sub(r"https?://\S+", "", text)
+    text = re.sub(r"[a-zA-Z0-9:/.%\-_=+]{4,}", "", text)
+    text = re.sub(r"\+?\d[\d\s\-]{5,}", "", text)
+    text = re.sub(r"[^一-龥。，！？、]", "", text)
+    sentences = re.split(r"[。！？]", text)
+    cleaned = "。".join(sentences[:4])
+    return cleaned[:300]
+
+def suspicious_tokens(text, explainer, top_k=5):
     try:
-        explanation = explainer.explain_instance(
-            text, predict_proba,
-            num_features=top_k,
-            labels=[1],
-            num_samples=700
-        )
-        keyword_scores = explanation.as_list(label=1)
-        keywords = [
-            word for word, score in keyword_scores
-            if len(word.strip()) > 1 and not re.match(r"^[。，！？、]+$", word)
-        ]
-        print(f"✅ 擷取到的可疑關鍵字: {keywords}")
+        shap_values = explainer.shap_values([text])
+        tokens = tokenizer.tokenize(text)
+        scores = shap_values[0][0]
+
+        token_score = list(zip(tokens, scores))
+        token_score.sort(key=lambda x: abs(x[1]), reverse=True)
+        keywords = [t for t, s in token_score if len(t.strip()) > 1][:top_k]
         return keywords
     except Exception as e:
-        print(f"⚠️ LIME 擾動分析失敗：{e}")
-        return []
-    
-def analyze_text(text):
-    model, tokenizer = load_model_and_tokenizer()
-    model.eval()
+        print("⚠ SHAP 失敗，啟用 fallback:", e)
+        fallback = ["繳費", "終止", "逾期", "限時", "驗證碼"]
+        return [kw for kw in fallback if kw in text]
 
-    # 預測標籤與信心分數
-    result = predict_single_sentence(model, tokenizer, text)
+model, tokenizer = load_model_and_tokenizer()
+model.eval()
+
+wrapped_model = ModelWrapper(model, tokenizer)
+
+background_data = np.array(background_data)
+
+explainer = shap.KernelExplainer(wrapped_model, background_data)
+def analyze_text(text):
+    cleaned_text = clean_text(text)
+
+    result = predict_single_sentence(model, tokenizer, cleaned_text)
     label = result["label"]
     prob = result["prob"]
     risk = result["risk"]
 
-    # 擷取可疑詞
-    suspicious = suspicious_tokens(model, tokenizer, text)
-    
+    suspicious = suspicious_tokens(cleaned_text, explainer)
+
+    highlighted_text = highlight_keywords(cleaned_text, suspicious)
+
     # ----------- 顯示推論資訊（後端終端機） -----------
     print(f"\n📩 訊息內容：{text}")
     print(f"✅ 預測結果：{label}")  
     print(f"📊 信心值：{round(prob*100, 2)}")
     print(f"⚠️ 風險等級：{risk}")
     print(f"可疑關鍵字擷取: { [str(s).strip() for s in suspicious if isinstance(s, str) and len(s.strip()) > 1]}")
-    
+
     return {
         "status": label,
         "confidence": round(prob * 100, 2),
-        "suspicious_keywords":  [str(s).strip() for s in suspicious if isinstance(s, str) and len(s.strip()) > 1]
+        "suspicious_keywords":  suspicious,
+        "highlighted_text": highlighted_text 
     }
+
+def highlight_keywords(text, keywords):
+    for word in keywords:
+        text = text.replace(word, f"<span class='highlight'>{word}</span>")
+    return text
 
 def analyze_image(file_bytes):
     image = Image.open(io.BytesIO(file_bytes))
@@ -213,6 +221,7 @@ def analyze_image(file_bytes):
         return{
             "status" : "無法辨識文字",
             "confidence" : 0.0,
-            "suspicious_keywords" : ["圖片中無可辨識的中文英文"]
+            "suspicious_keywords" : ["圖片中無可辨識的中文英文"],
+            "highlighted_text": "無法辨識可疑內容"
         }
     return analyze_text(text)

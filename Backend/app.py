@@ -82,6 +82,7 @@ class TextAnalysisResponse(BaseModel): # 回傳前端
     status: str                      # 預測結果：詐騙/正常
     confidence: float                # 信心分數(通常為 100~0)
     suspicious_keywords: List[str]   # 可疑詞語清單(目前只會回傳風險分級顯示)
+    highlighted_text: str
     analysis_timestamp: datetime     # 分析完成時間(偏向資料庫用途,目前沒用到)
     
     
@@ -125,6 +126,7 @@ async def analyze_text_api(request: TextAnalysisRequest):
             status=result["status"],
             confidence=result["confidence"],
             suspicious_keywords=result["suspicious_keywords"],
+            highlighted_text=result["highlighted_text"],
             analysis_timestamp=datetime.now(),
         )
         except Exception as e:
@@ -142,6 +144,7 @@ async def predict_image_api(file: UploadFile = File(...)):
             status=result["status"],
             confidence=result["confidence"],
             suspicious_keywords=result["suspicious_keywords"],
+            highlighted_text=result["highlighted_text"],
             analysis_timestamp=datetime.now()
         )
     except Exception as e:
