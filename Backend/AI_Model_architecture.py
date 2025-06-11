@@ -29,7 +29,11 @@ import ast
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import (
+    classification_report, confusion_matrix, accuracy_score, 
+    precision_score, recall_score, f1_score, roc_auc_score,
+    precision_recall_curve, auc, matthews_corrcoef
+)
 from dotenv import load_dotenv
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset #	提供 Dataset、DataLoader 類別
@@ -250,93 +254,194 @@ pos_weight = torch.tensor([2.13], dtype=torch.float32).to(device)
 criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
 # 本機訓練迴圈,要訓練再取消註解,否則在線上版本一律處於註解狀態
+# 訓練期間用的簡化版驗證函式 (只回傳 loss / acc)
+def evaluate_epoch(model, dataloader, criterion, device):
+    model.eval()
+    total_loss = 0
+    all_labels, all_preds = [], []
 
-if __name__ == "__main__": # 只有當我「直接執行這個檔案」時,才執行以下訓練程式(不是被別人 import 使用時)。
-    model_path = os.path.join(os.path.dirname(__file__), "model.pth")
-    if os.path.exists(model_path):
-        print("✅ 已找到 model.pth,載入模型跳過訓練")
-        model.load_state_dict(torch.load(model_path, map_location=device))
-    else:
-        print("🚀 未找到 model.pth,開始訓練模型...")
-        num_epochs = 15 # batch_size設定在train_loader和test_loader那
-        for epoch in range(num_epochs):
-            model.train() # 從nn.Module繼承的方法。將模型設為「訓練模式」,有些層(像 Dropout 或 BatchNorm)會啟用訓練行為。
-            total_loss = 0.0
-            for batch in train_loader:
-            
-            
-                # 清理舊梯度,以免累加。為甚麼要?因為PyTorch 預設每次呼叫 .backward() 都會「累加」梯度(不會自動清掉)
-                # 沒 .zero_grad(),梯度會越累積越多,模型會亂掉。
-                optimizer.zero_grad() 
-                
-                input_ids = batch["input_ids"].to(device)
-                attention_mask = batch["attention_mask"].to(device)
-                token_type_ids = batch["token_type_ids"].to(device)
-                labels = batch["labels"].to(device)
-                outputs = model(input_ids, attention_mask, token_type_ids)
-                
-                loss = criterion(outputs, labels) # 比較 預測結果 outputs(Sigmoid 的機率)和 真實答案 labels
-                
-                # 用鏈式法則(Chain Rule)計算每一層「參數對 loss 的影響」,也就是梯度
-                # PyTorch 利用自動微分(autograd)幫你計算整個計算圖的偏導數,然後存在每一層的 .grad 裡。
-                loss.backward()
-                
-                # 用 .grad 中的梯度資訊根
-                # 據學習率和優化器的規則
-                # 改變每一個參數的值,以讓下一次預測更接近真實
-                optimizer.step()
-                
-                # loss 是一個 tensor(需要 backward);.item() 把它轉成 Python 的純數字(float)
-                total_loss += loss.item()
-            print(f"[Epoch{epoch+1}]Training Loss:{total_loss:.4f}")
-        torch.save(model.state_dict(), model_path)# 儲存模型權重
-        print("✅ 模型訓練完成並儲存為 model.pth")
+    with torch.no_grad():
+        for batch in dataloader:
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
+            token_type_ids = batch["token_type_ids"].to(device)
+            labels = batch["labels"].to(device)
 
-def evaluate_model(model, val_loader, device="cuda" if torch.cuda.is_available() else "cpu"):
+            outputs = model(input_ids, attention_mask, token_type_ids)
+            loss = criterion(outputs, labels)
+            total_loss += loss.item()
+
+            preds = (torch.sigmoid(outputs) > 0.5).long()
+            all_labels.extend(labels.cpu().numpy())
+            all_preds.extend(preds.cpu().numpy())
+
+    acc = accuracy_score(all_labels, all_preds)
+    avg_loss = total_loss / len(dataloader)
+    return avg_loss, acc
+
+# 修改訓練主程式
+
+def train_model(model, train_loader, val_loader, optimizer, criterion, device, num_epochs=15, save_path="model.pth"):
+    train_loss_list, val_loss_list = [], []
+    train_acc_list, val_acc_list = [], []
+
+    for epoch in range(num_epochs):
+        model.train()
+        total_train_loss = 0
+        train_true, train_pred = [], []
+
+        for batch in train_loader:
+            optimizer.zero_grad()
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
+            token_type_ids = batch["token_type_ids"].to(device)
+            labels = batch["labels"].to(device)
+
+            outputs = model(input_ids, attention_mask, token_type_ids)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            total_train_loss += loss.item()
+            preds = (torch.sigmoid(outputs) > 0.5).long()
+            train_true.extend(labels.cpu().numpy())
+            train_pred.extend(preds.cpu().numpy())
+
+        train_acc = accuracy_score(train_true, train_pred)
+        train_loss = total_train_loss / len(train_loader)
+
+        val_loss, val_acc = evaluate_epoch(model, val_loader, criterion, device)
+
+        train_loss_list.append(train_loss)
+        val_loss_list.append(val_loss)
+        train_acc_list.append(train_acc)
+        val_acc_list.append(val_acc)
+
+        print(f"[Epoch {epoch+1}] Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
+
+    torch.save(model.state_dict(), save_path)
+    print(f"✅ 模型訓練完成並儲存為 {save_path}")
+
+    # 可視化 Loss Curve
+    plt.figure(figsize=(8, 5))
+    plt.plot(range(1, num_epochs+1), train_loss_list, label="Train Loss")
+    plt.plot(range(1, num_epochs+1), val_loss_list, label="Val Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title("Loss Curve")
+    plt.legend()
+    plt.show()
+
+    # 可視化 Accuracy Curve
+    plt.figure(figsize=(8, 5))
+    plt.plot(range(1, num_epochs+1), train_acc_list, label="Train Accuracy")
+    plt.plot(range(1, num_epochs+1), val_acc_list, label="Val Accuracy")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.title("Accuracy Curve")
+    plt.legend()
+    plt.show()
+
+        # 訓練結束後繪製 Loss Curve
+    plt.figure(figsize=(8, 5))
+    plt.plot(range(1, num_epochs+1), train_loss_list, label="Train Loss")
+    plt.plot(range(1, num_epochs+1), val_loss_list, label="Val Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title("Loss Curve")
+    plt.legend()
+    plt.show()
+
+        # 繪製 Accuracy Curve
+    plt.figure(figsize=(8, 5))
+    plt.plot(range(1, num_epochs+1), train_acc_list, label="Train Accuracy")
+    plt.plot(range(1, num_epochs+1), val_acc_list, label="Val Accuracy")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.title("Accuracy Curve")
+    plt.legend()
+    plt.show()
+
+def evaluate_model(model, val_loader, device):
     model.eval()
     y_true = []
     y_pred = []
+    y_pred_prob = []
 
     with torch.no_grad():
         for batch in val_loader:
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
             token_type_ids = batch["token_type_ids"].to(device)
-            label_batch = batch["labels"].to(device)  # ✅ 避免與下方 label_name 衝突
+            labels = batch["labels"].to(device)
 
             outputs = model(input_ids, attention_mask, token_type_ids)
-            preds = (outputs > 0.5).long()
+            probs = torch.sigmoid(outputs)
+            preds = (probs > 0.5).long()
 
-            y_true.extend(label_batch.cpu().numpy())
+            y_true.extend(labels.cpu().numpy())
             y_pred.extend(preds.cpu().numpy())
-    
-      # 各項評估指標
+            y_pred_prob.extend(probs.cpu().numpy())
+
     acc = accuracy_score(y_true, y_pred)
     prec = precision_score(y_true, y_pred)
     rec = recall_score(y_true, y_pred)
     f1 = f1_score(y_true, y_pred)
+    spec = recall_score(y_true, y_pred, pos_label=0)
+    mcc = matthews_corrcoef(y_true, y_pred)
+    roc_auc = roc_auc_score(y_true, y_pred_prob)
+    precision_curve, recall_curve, _ = precision_recall_curve(y_true, y_pred_prob)
+    pr_auc = auc(recall_curve, precision_curve)
 
-    print("✅ 模型驗證結果：")
-    print(f"Accuracy  : {acc:.4f}")
-    print(f"Precision : {prec:.4f}")
-    print(f"Recall    : {rec:.4f}")
-    print(f"F1-score  : {f1:.4f}")
+    metrics_dict = {
+        'Accuracy': acc,
+        'Precision': prec,
+        'Recall': rec,
+        'Specificity': spec,
+        'F1-score': f1,
+        'MCC': mcc,
+        'ROC AUC': roc_auc,
+        'PR AUC': pr_auc
+    }
 
-    # 混淆矩陣
-    cm = confusion_matrix(y_true, y_pred)
-    label_names = ["Scam (0)", "Normal (1)"]
+    # 視覺化：整體指標 bar chart
+    metric_names = list(metrics_dict.keys())
+    metric_values = list(metrics_dict.values())
 
-    plt.figure(figsize=(6, 5))
-    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=label_names, yticklabels=label_names)
-    plt.xlabel("Predict")
-    plt.ylabel("Actual")
-    plt.title("🔍 Confusion Matrix")
+    plt.figure(figsize=(10, 6))
+    sns.barplot(y=metric_names, x=metric_values, palette="Blues_d")
+    for index, value in enumerate(metric_values):
+        plt.text(value + 0.01, index, f"{value:.4f}", va='center')
+    plt.title("模型評估指標")
+    plt.xlim(0, 1.05)
+    plt.xlabel("Score")
+    plt.ylabel("Metric")
+    plt.grid(axis='x', linestyle='--', alpha=0.7)
     plt.tight_layout()
     plt.show()
 
-    # 評估報告
-    report = classification_report(y_true, y_pred, target_names=label_names, digits=4)
-    print("📋 分類報告 (Classification Report):\n", report)
+    # 視覺化：Confusion Matrix
+    cm = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(6, 5))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=["Scam (0)", "Normal (1)"], yticklabels=["Scam (0)", "Normal (1)"])
+    plt.xlabel("Predict")
+    plt.ylabel("Actual")
+    plt.title("Confusion Matrix")
+    plt.tight_layout()
+    plt.show()
+
+    # PR Curve (額外 bonus)
+    plt.plot(recall_curve, precision_curve, marker='.')
+    plt.title('Precision-Recall Curve')
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.show()
+
+    # ROC Curve (額外 bonus)
+    from sklearn.metrics import RocCurveDisplay
+    RocCurveDisplay.from_predictions(y_true, y_pred_prob)
+    plt.title('ROC Curve')
+    plt.show()
 
 
 # 放在主程式中呼叫
