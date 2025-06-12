@@ -52,7 +52,7 @@ def predict_single_sentence(model, tokenizer, sentence, max_len=256):
     with torch.no_grad():
         output = model(encoded["input_ids"], encoded["attention_mask"], encoded["token_type_ids"])
         prob = torch.sigmoid(output).item()
-        label = int(prob > 0.3) 
+        label = int(prob > 0.5)
 
     risk = "🟢 低風險（正常）"
     if prob > 0.9:
