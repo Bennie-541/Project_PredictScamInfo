@@ -68,7 +68,8 @@ document.addEventListener('DOMContentLoaded', () => {
             updateResults(              //呼叫function，分別對應function的
                 data.status,            //isScam,輸出正常或詐騙
                 data.confidence,        //confidence,輸出信心值
-                data.suspicious_keywords//suspiciousParts,可疑關鍵字
+                data.suspicious_keywords,//suspiciousParts,可疑關鍵字
+                data.highlighted_text
             );
         } catch (error) {// 捕獲並處理任何在 fetch 過程中發生的錯誤 (例如網路問題、CORS 錯誤)
             
@@ -104,7 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
             updateResults(
                 data.status,
                 data.confidence,
-                data.suspicious_keywords
+                data.suspicious_keywords,
+                data.highlighted_text
             )
         }catch(error) {
             console.error("圖片上傳失敗",error);
@@ -113,15 +115,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    function highlightSuspiciousWords(text, suspiciousParts) {
+    function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+/*
+function highlightSuspiciousWords(text, suspiciousParts) {
     let highlighted = text;
     suspiciousParts.forEach(word => {
-        const pattern = new RegExp(word, 'g');
+        if (word.length < 2) return; // 避免標記太短詞（如單個字或符號）
+        const pattern = new RegExp(escapeRegExp(word), 'g');
         highlighted = highlighted.replace(pattern, `<span class="highlight">${word}</span>`);
     });
     return highlighted;
 }
-
+*/
     // --- 清除按鈕點擊事件監聽器 ---
     // 當清除按鈕被點擊時，執行函數
     clearButton.addEventListener('click', () => {
@@ -144,21 +151,10 @@ document.addEventListener('DOMContentLoaded', () => {
      */
 
     //回傳輸出給index.html顯示
-    function updateResults(isScam, confidence, suspiciousParts) {
-        //輸出正常或詐騙
+    function updateResults(isScam, confidence, suspiciousParts, highlightedText) {
         normalOrScam.textContent = isScam;
-        // 顯示模型預測的可信度
-        confidenceScoreSpan.textContent = confidence//`${(confidence * 100).toFixed(2)}%`; 
-
-        suspiciousPhrasesDiv.innerHTML = ''; // 清空之前顯示的可疑詞句
-        //05/23目前未做出抓出關鍵字功能，預設為顯示輸入句子
-        // 如果有可疑詞句，則以列表形式顯示
-        if (suspiciousParts && suspiciousParts.length > 0) {
-            const highlightedText = highlightSuspiciousWords(inputTextArea.value, suspiciousParts);
-            suspiciousPhrasesDiv.innerHTML = `<p>${highlightedText}</p>`;
-        } else {
-            suspiciousPhrasesDiv.innerHTML = '<p>沒有偵測到特別可疑的詞句。</p>';
-        }
+        confidenceScoreSpan.textContent = confidence;
+        suspiciousPhrasesDiv.innerHTML = `<p>${highlightedText}</p>`;
     }
 
     /**
