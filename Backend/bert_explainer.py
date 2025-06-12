@@ -100,7 +100,7 @@ lime_explainer = LimeTextExplainer(class_names=class_names)
 # 擷取可疑詞彙 (改用 LIME)
 def suspicious_tokens(text, explainer=lime_explainer, top_k=5):
     try:
-        explanation = explainer.explain_instance(text, predict_proba, num_features=top_k, num_samples=500 )
+        explanation = explainer.explain_instance(text, predict_proba, num_features=top_k, num_samples=200)
         keywords = [word for word, weight in explanation.as_list()]
         return keywords
     except Exception as e:
