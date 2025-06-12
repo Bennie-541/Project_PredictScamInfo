@@ -91,6 +91,18 @@ def predict_proba(texts):
     probs_2d = np.vstack([1-probs, probs]).T
     return probs_2d
 
+    # 移動到 GPU 或 CPU
+    encoded = {k: v.to(device) for k, v in encoded.items()}
+
+    with torch.no_grad():
+        outputs = model(encoded["input_ids"], encoded["attention_mask"], encoded["token_type_ids"])
+        # outputs shape: (batch_size,)
+        probs = torch.sigmoid(outputs).cpu().numpy()
+
+    # 轉成 LIME 格式：(N, 2)
+    probs_2d = np.vstack([1-probs, probs]).T
+    return probs_2d
+
 # 初始化 LIME explainer
 class_names = ['正常', '詐騙']
 lime_explainer = LimeTextExplainer(class_names=class_names)
