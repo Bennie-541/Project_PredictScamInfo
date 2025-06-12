@@ -53,7 +53,6 @@ def predict_single_sentence(model, tokenizer, sentence, max_len=256):
         output = model(encoded["input_ids"], encoded["attention_mask"], encoded["token_type_ids"])
         prob = torch.sigmoid(output).item()
         label = int(prob > 0.5)
-
     risk = "🟢 低風險（正常）"
     if prob > 0.9:
         risk = "🔴 高風險（極可能是詐騙）"
@@ -86,6 +85,7 @@ def predict_proba(texts):
         outputs = model(encoded["input_ids"], encoded["attention_mask"], encoded["token_type_ids"])
         # outputs shape: (batch_size,)
         probs = torch.sigmoid(outputs).cpu().numpy()
+
 
     # 轉成 LIME 格式：(N, 2)
     probs_2d = np.vstack([1-probs, probs]).T
