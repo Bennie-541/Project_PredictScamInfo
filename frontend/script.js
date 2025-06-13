@@ -154,7 +154,12 @@ function highlightSuspiciousWords(text, suspiciousParts) {
     function updateResults(isScam, confidence, suspiciousParts, highlightedText) {
     normalOrScam.textContent = isScam;
     confidenceScoreSpan.textContent = confidence;
-    suspiciousPhrasesDiv.innerHTML = highlightedText;  // ✅ 這裡直接用 highlightedText
+
+    if (confidence < 15) {
+        suspiciousPhrasesDiv.innerHTML = '<p>此訊息為低風險，未發現可疑詞句。</p>';
+    } else {
+        suspiciousPhrasesDiv.innerHTML = highlightedText;
+    }
 }
 
     /**

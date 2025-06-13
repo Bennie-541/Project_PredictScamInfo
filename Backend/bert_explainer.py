@@ -99,14 +99,17 @@ lime_explainer = LimeTextExplainer(class_names=class_names)
 
 # 擷取可疑詞彙 (改用 LIME)
 
+def suspicious_tokens(text, explainer=lime_explainer, top_k=5):
+    try:
+        explanation = explainer.explain_instance(text, predict_proba, num_features=top_k, num_samples=200)
+        keywords = [word for word, weight in explanation.as_list()]
+        return keywords
+    except Exception as e:
+        print("⚠ LIME 失敗，啟用 fallback:", e)
+        fallback = ["繳費", "終止", "逾期", "限時", "驗證碼"]
+        return [kw for kw in fallback if kw in text]
 
-def highlight_keywords(text, keywords):
-    for phrase in keywords:
-        for word in jieba.cut(phrase):
-            word = word.strip()
-            if len(word) >= 2 and word in text:
-                text = text.replace(word, f"<span class='highlight'>{word}</span>")
-    return text
+
 # 文字清理
 def clean_text(text):
     text = re.sub(r"https?://\S+", "", text)
@@ -118,10 +121,23 @@ def clean_text(text):
     return cleaned[:300]
 
 # 高亮顯示
-def highlight_keywords(text, keywords):
+def highlight_keywords(text, keywords, prob):
+    
+    if prob < 0.15:  # 低風險完全不標註
+        return text
+
+    # 決定標註顏色
+    if prob >= 0.65:
+        css_class = 'red-highlight'
+    else:
+        css_class = 'yellow-highlight'
     for word in keywords:
-        text = text.replace(word, f"<span class='highlight'>{word}</span>")
+        if len(word.strip()) >= 2:
+            text = text.replace(word, f"<span class='{css_class}'>{word}</span>")
     return text
+
+
+
 
 # 文字分析主流程
 def analyze_text(text):
@@ -130,10 +146,14 @@ def analyze_text(text):
     label = result["label"]
     prob = result["prob"]
     risk = result["risk"]
-
+    
     suspicious = suspicious_tokens(cleaned_text)
-    highlighted_text = highlight_keywords(text, suspicious)
-
+    # 依照可疑度做不同標註
+    highlighted_text = highlight_keywords(text, suspicious, prob)
+    # 低風險下不回傳 suspicious_keywords
+    if prob < 0.15:
+        suspicious = []
+        
     print(f"\n📩 訊息內容：{text}")
     print(f"✅ 預測結果：{label}")  
     print(f"📊 信心值：{round(prob*100, 2)}")

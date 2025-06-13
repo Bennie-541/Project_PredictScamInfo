@@ -20,6 +20,7 @@
 
 """
 #引入重要套件Import Library
+
 import os
 import torch                            #   PyTorch 主模組               
 import torch.nn as nn                   #	神經網路相關的層(例如 LSTM、Linear)        
@@ -41,7 +42,7 @@ from transformers import BertTokenizer # BertTokenizer把文字句子轉換成 B
 from sklearn.model_selection import train_test_split
 
 from transformers import BertModel
-
+"""
 # ------------------- 載入 .env 環境變數 -------------------
 
 path = r"E:\Project_PredictScamInfo"
@@ -154,7 +155,7 @@ if __name__ == "__main__":
     # 每次從 Dataset 中抓一批(batch)資料出來
     train_loader = DataLoader(train_dataset, batch_size=128)
     val_loader = DataLoader(val_dataset, batch_size=128)
-
+"""
 """
 class BertLSTM_CNN_Classifier(nn.Module)表示:你定義了一個子類別,
 繼承自 PyTorch 的基礎模型類別 nn.Module。
@@ -242,7 +243,7 @@ logits = [[0.92], [0.05], [0.88], [0.41], ..., [0.17]]
 → squeeze → [0.715, 0.512, ...]
 """
         return logits.squeeze() # 最後輸出是一個值介於 0 ~ 1 之間,代表「為詐騙訊息的機率」。
-        
+"""
 # 設定 GPU 裝置
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -448,7 +449,7 @@ def evaluate_model(model, val_loader, device):
 if __name__ == "__main__":
     print("✅ 開始驗證模型效果...")
     evaluate_model(model, val_loader, device)
-
+"""
 """
 
 整個模型中每一個文字(token)始終是一個向量,隨著層數不同,這個向量代表的意義會更高階、更語意、更抽象。

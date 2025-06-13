@@ -20,6 +20,21 @@ body {
     padding: 2px 4px;
     border-radius: 4px;
 }
+.yellow-highlight {
+    background-color: #ffeb3b85; /* 半透明黃色 */
+    color: #000000;
+    font-weight: bold;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+.red-highlight {
+    background-color: #fc9c9cd5;
+    color: #000000;
+    font-weight: bold;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
 
 h1 {
     color: #2c3e50;
