@@ -1,6 +1,6 @@
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-
+import jieba
 import torch                
 import re
 import easyocr
@@ -98,16 +98,15 @@ class_names = ['正常', '詐騙']
 lime_explainer = LimeTextExplainer(class_names=class_names)
 
 # 擷取可疑詞彙 (改用 LIME)
-def suspicious_tokens(text, explainer=lime_explainer, top_k=5):
-    try:
-        explanation = explainer.explain_instance(text, predict_proba, num_features=top_k, num_samples=200)
-        keywords = [word for word, weight in explanation.as_list()]
-        return keywords
-    except Exception as e:
-        print("⚠ LIME 失敗，啟用 fallback:", e)
-        fallback = ["繳費", "終止", "逾期", "限時", "驗證碼"]
-        return [kw for kw in fallback if kw in text]
 
+
+def highlight_keywords(text, keywords):
+    for phrase in keywords:
+        for word in jieba.cut(phrase):
+            word = word.strip()
+            if len(word) >= 2 and word in text:
+                text = text.replace(word, f"<span class='highlight'>{word}</span>")
+    return text
 # 文字清理
 def clean_text(text):
     text = re.sub(r"https?://\S+", "", text)

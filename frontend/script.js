@@ -152,10 +152,10 @@ function highlightSuspiciousWords(text, suspiciousParts) {
 
     //回傳輸出給index.html顯示
     function updateResults(isScam, confidence, suspiciousParts, highlightedText) {
-        normalOrScam.textContent = isScam;
-        confidenceScoreSpan.textContent = confidence;
-        suspiciousPhrasesDiv.innerHTML = `<p>${highlightedText}</p>`;
-    }
+    normalOrScam.textContent = isScam;
+    confidenceScoreSpan.textContent = confidence;
+    suspiciousPhrasesDiv.innerHTML = highlightedText;  // ✅ 這裡直接用 highlightedText
+}
 
     /**
      * 重置所有顯示結果為初始狀態的輔助函數
